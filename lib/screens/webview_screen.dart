@@ -53,6 +53,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   Future<void> _resetFromApp() async {
     final schedule = await NativeBridge.getSchedule();
+    if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
