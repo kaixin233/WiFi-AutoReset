@@ -17,6 +17,17 @@ android {
         versionName = flutter.versionName
     }
 
+    buildTypes {
+        release {
+            // CI 无正式 keystore，使用 AGP 内置 debug 签名，确保 APK 可被系统解析安装。
+            // 显式开启 V1+V2 签名：部分国产 ROM（如 MIUI）对仅 V2 签名或签名块异常的包
+            // 会报 "解析软件包时出现问题 (33) / packageinfo is null"。
+            signingConfig = signingConfigs.getByName("debug")
+            isV1SigningEnabled = true
+            isV2SigningEnabled = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
