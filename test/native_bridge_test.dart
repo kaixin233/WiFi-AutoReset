@@ -150,7 +150,7 @@ void main() {
       expect(status.signalLabel, '极好');
       expect(status.rssi, -77);
       expect(status.wifiClients, 2);
-      expect(status.uptimeLabel, contains('小时'));
+      expect(status.uptimeLabel, '41 分钟');
 
       final empty = DeviceStatus.fromMap({'result': '1', 'msg': 'api not found'});
       expect(empty.hasBattery, isFalse);
