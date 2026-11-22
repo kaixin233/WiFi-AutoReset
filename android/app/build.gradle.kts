@@ -19,12 +19,10 @@ android {
 
     buildTypes {
         release {
-            // CI 无正式 keystore，使用 AGP 内置 debug 签名，确保 APK 可被系统解析安装。
-            // 显式开启 V1+V2 签名：部分国产 ROM（如 MIUI）对仅 V2 签名或签名块异常的包
-            // 会报 "解析软件包时出现问题 (33) / packageinfo is null"。
+            // CI 无正式 keystore，使用 AGP 内置 debug 签名（默认含 V1+V2 签名块），
+            // 确保产出的 APK 可被 MIUI 等国产 ROM 正确解析安装，
+            // 否则会报 "解析软件包时出现问题 (33) / packageinfo is null"。
             signingConfig = signingConfigs.getByName("debug")
-            v1SigningEnabled = true
-            v2SigningEnabled = true
         }
     }
 
