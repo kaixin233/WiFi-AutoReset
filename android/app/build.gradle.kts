@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.kaixin233.wifiautoreset"
     compileSdk = 36
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.kaixin233.wifiautoreset"
