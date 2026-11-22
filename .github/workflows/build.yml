@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -52,3 +55,34 @@ jobs:
           name: wifi-auto-reset-release
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: WiFi 自动重置 v1.0.0
+          body: |
+            ## WiFi 自动重置 v1.0.0
+
+            面向小米手机（Android 16、64 位）的随身 WiFi 自动化控制 App。
+
+            ### 功能
+            - 实时网速（每秒采样收发字节差）
+            - 前台应用包名检测（需授权「使用情况访问」）
+            - WebView 管理页自动登录 admin/admin
+            - 恢复出厂 / 重启 / 清流量三种操作，均带二次确认
+            - 整点定时自动化 + 本地执行日志
+            - 默认演练模式（只记日志不发包）
+
+            ### 实测设备
+            Marvell/mifi 固件（LBF1A），HTTP Digest 认证，恢复出厂对应 `json_device_restore_factory`。
+
+            ### ⚠️ 风险提示
+            真·恢复出厂会清空 SSID、WiFi 密码和管理账号并重启，手机会立刻断网。请先用演练模式验证日志，确认后再关闭演练。
+
+            完整说明见仓库 README。
+          files: build/app/outputs/flutter-apk/app-release.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
