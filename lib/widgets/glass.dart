@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 /// 液体玻璃设计令牌：深空底色 + 冷色高光。

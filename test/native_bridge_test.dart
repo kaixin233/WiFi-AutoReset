@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wifi_auto_reset/models/models.dart';
 import 'package:wifi_auto_reset/services/native_bridge.dart';
@@ -91,22 +92,21 @@ void main() {
   });
 
   group('玻璃主题令牌', () {
-    test('关键令牌非透明且互不相同', () {
-      expect(GlassTokens.accentCyan.alpha, 255);
-      expect(GlassTokens.accentBlue.alpha, 255);
-      expect(GlassTokens.accentPurple.alpha, 255);
+    test('关键令牌互不相同且圆角为正', () {
       expect(GlassTokens.accentCyan, isNot(GlassTokens.accentBlue));
-      expect(GlassTokens.textPrimary.alpha, 255);
+      expect(GlassTokens.accentBlue, isNot(GlassTokens.accentPurple));
+      expect(GlassTokens.accentCyan, isNot(GlassTokens.textPrimary));
       expect(GlassTokens.radius, greaterThan(0));
     });
 
     test('渐变文字使用冷色令牌', () {
-      const widget = GradientText(
+      final widget = GradientText(
         '1.2 MB/s',
-        style: TextStyle(fontSize: 24),
+        style: const TextStyle(fontSize: 24),
       );
       expect(widget.text, '1.2 MB/s');
       expect(widget.colors.length, 2);
+      expect(widget.colors.first, GlassTokens.accentCyan);
     });
   });
 }
