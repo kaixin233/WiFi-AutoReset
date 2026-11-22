@@ -56,6 +56,20 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
+      - name: Diagnose APK (signing & manifest)
+        continue-on-error: true
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          echo "===== FILE ====="
+          ls -lh "$APK"
+          echo "===== AAPT BADGING ====="
+          $ANDROID_HOME/build-tools/36.0.0/aapt dump badging "$APK" 2>/dev/null | head -20 || \
+            find "$ANDROID_HOME/build-tools" -name aapt -type f | head -1 | xargs -I{} {} dump badging "$APK" 2>/dev/null | head -20
+          echo "===== APKSIGNER VERIFY ====="
+          $ANDROID_HOME/build-tools/36.0.0/apksigner verify --verbose --print-certs "$APK" 2>&1 | head -30
+          echo "===== ZIP CONTENT (top) ====="
+          unzip -l "$APK" 2>/dev/null | head -30
+
       - name: Publish GitHub Release
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
