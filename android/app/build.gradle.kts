@@ -17,15 +17,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // 固定签名密钥随仓库提交，确保每次 CI 构建使用同一证书。
+        // 覆盖安装的硬性条件：包名不变 + 签名证书不变 + versionCode 递增。
+        // 从 v1.0.3 起统一使用本密钥；之后的版本均可直接覆盖安装。
+        create("release") {
+            storeFile = file("release.p12")
+            storePassword = "wifi-auto-reset-2026"
+            keyAlias = "wifiautoreset"
+            keyPassword = "wifi-auto-reset-2026"
+            storeType = "PKCS12"
+        }
+    }
+
     buildTypes {
         release {
-            // CI 无正式 keystore，使用 AGP 内置 debug 签名（默认含 V1+V2 签名块），
-            // 确保产出的 APK 可被 MIUI 等国产 ROM 正确解析安装，
-            // 否则会报 "解析软件包时出现问题 (33) / packageinfo is null"。
-            //
-            // 覆盖安装依赖：包名不变 + 签名证书不变 + versionCode 递增。
-            // 请勿在版本迭代中途更换签名方式，否则系统会拒绝覆盖安装。
-            signingConfig = signingConfigs.getByName("debug")
+            // 使用 V2 签名块，确保 MIUI 等国产 ROM 正确解析安装，
+            // 避免 "解析软件包时出现问题 (33) / packageinfo is null"。
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

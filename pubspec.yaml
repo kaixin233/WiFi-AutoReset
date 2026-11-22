@@ -1,7 +1,7 @@
 name: wifi_auto_reset
 description: "随身 WiFi 自动化控制：实时网速、前台应用、定时恢复出厂与执行日志"
 publish_to: "none"
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

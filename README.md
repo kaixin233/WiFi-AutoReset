@@ -57,7 +57,11 @@ flutter test
 flutter build apk --release --target-platform android-arm64
 ```
 
-**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 `1.0.2+3`，versionCode = 3）。Release 与 Debug 共用同一签名配置，请勿在版本迭代中途更换签名方式，否则系统会拒绝覆盖安装。若某次 CI 重新生成了 debug 密钥导致签名变化，MIUI 会提示签名不一致，此时只需卸载一次，后续版本即可正常覆盖。
+**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 `1.0.3+4`，versionCode = 4）。
+
+从 v1.0.3 起，Release 使用仓库内固定的 `android/app/release.p12` 签名（PKCS12，别名 `wifiautoreset`），CI 每次构建都使用同一证书，之后的版本可直接覆盖安装且保留 SharedPreferences 与日志数据。
+
+> 注意：v1.0.1 / v1.0.2 使用 CI 自动生成的 debug 密钥，两次构建证书不同，无法互相覆盖。从旧版升级到 v1.0.3 需要**先卸载一次**；这是 Android 签名机制的硬性限制，之后不再需要。
 
 ## 权限
 
