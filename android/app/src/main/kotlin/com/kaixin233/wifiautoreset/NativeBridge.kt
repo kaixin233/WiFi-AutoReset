@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -13,7 +13,7 @@ import java.util.concurrent.Executors
 
 class NativeBridge(
     private val context: Context,
-    messenger: DartExecutor.BinaryMessenger,
+    messenger: BinaryMessenger,
 ) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
     private val methodChannel = MethodChannel(messenger, CHANNEL)
@@ -28,7 +28,7 @@ class NativeBridge(
         const val CHANNEL = "com.kaixin233.wifiautoreset/native"
         const val SPEED_CHANNEL = "com.kaixin233.wifiautoreset/speed"
 
-        fun attach(context: Context, messenger: DartExecutor.BinaryMessenger): NativeBridge {
+        fun attach(context: Context, messenger: BinaryMessenger): NativeBridge {
             val bridge = NativeBridge(context, messenger)
             bridge.methodChannel.setMethodCallHandler(bridge)
             bridge.eventChannel.setStreamHandler(bridge)
