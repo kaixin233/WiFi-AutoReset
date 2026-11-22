@@ -163,7 +163,7 @@ void main() {
     test('关键令牌互不相同且圆角为正', () {
       expect(GlassTokens.accentCyan, isNot(GlassTokens.accentBlue));
       expect(GlassTokens.accentBlue, isNot(GlassTokens.accentPurple));
-      expect(GlassTokens.accentCyan, isNot(GlassTokens.textPrimary));
+      expect(GlassTokens.accentCyan, isNot(GlassPalette.dark.textPrimary));
       expect(GlassTokens.radius, greaterThan(0));
     });
 

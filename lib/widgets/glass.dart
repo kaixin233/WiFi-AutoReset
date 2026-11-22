@@ -76,7 +76,7 @@ class GlassPalette {
     bgMid: Color(0xFF141C3C),
     bgBottom: Color(0xFF090D1E),
     textPrimary: Color(0xFFF3F6FF),
-    textMuted: Color(0xFFAAA9B8D6),
+    textMuted: Color(0xAAA9B8D6),
     accentCyan: GlassTokens.accentCyan,
     accentBlue: GlassTokens.accentBlue,
     accentPurple: GlassTokens.accentPurple,
