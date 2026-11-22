@@ -46,8 +46,10 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build release APK (arm64 only)
+        # 客户设备为小米 Android 16 64 位，只需 arm64-v8a。
+        # 只打单一 ABI 可把 APK 从 ~48MB 降到 ~18MB。
+        run: flutter build apk --release --target-platform android-arm64
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -91,6 +93,9 @@ jobs:
 
             ### 实测设备
             Marvell/mifi 固件（LBF1A），HTTP Digest 认证，恢复出厂对应 `json_device_restore_factory`。
+
+            ### 适配架构
+            仅含 arm64-v8a（针对小米 Android 16 64 位设备），APK 约 18MB。安装包已正确签名，可正常解析安装。
 
             ### ⚠️ 风险提示
             真·恢复出厂会清空 SSID、WiFi 密码和管理账号并重启，手机会立刻断网。请先用演练模式验证日志，确认后再关闭演练。
