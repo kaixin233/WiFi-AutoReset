@@ -49,6 +49,18 @@ class NativeBridge {
     return <String, dynamic>{};
   }
 
+  static Future<DeviceStatus> statusInfo() async {
+    final raw = await _channel.invokeMethod<String>('statusInfo');
+    if (raw == null || raw.isEmpty) return const DeviceStatus();
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) return DeviceStatus.fromMap(asMap(decoded));
+    } catch (_) {
+      // 固件可能返回非 JSON 文本，忽略即可。
+    }
+    return const DeviceStatus();
+  }
+
   static Future<bool> gatewayReachable() async {
     final value = await _channel.invokeMethod<bool>('gatewayReachable');
     return value ?? false;
@@ -71,9 +83,11 @@ class NativeBridge {
 
   static Future<ScheduleState> configureSchedule({
     required bool enabled,
+    required int intervalMinutes,
   }) async {
     final map = await _channel.invokeMethod('configureSchedule', {
       'enabled': enabled,
+      'intervalMinutes': intervalMinutes,
     });
     return ScheduleState.fromMap(asMap(map));
   }

@@ -19,6 +19,34 @@ void main() {
     });
   });
 
+  group('nextRunAt', () {
+    test('60 分钟对齐到整点后 5 秒', () {
+      final now = DateTime(2026, 11, 22, 10, 34, 12);
+      final next = nextRunAt(now, 60);
+      expect(next.hour, 11);
+      expect(next.minute, 0);
+      expect(next.second, 5);
+    });
+
+    test('自定义周期按纪元对齐', () {
+      final now = DateTime(2026, 11, 22, 10, 7, 0);
+      final next = nextRunAt(now, 15);
+      expect(next.isAfter(now), isTrue);
+      expect(next.minute % 15, 0);
+      expect(next.second, 5);
+      expect(next.difference(now).inMinutes, lessThan(15));
+    });
+
+    test('跨天边界仍然正确', () {
+      final now = DateTime(2026, 11, 22, 23, 50, 0);
+      final next = nextRunAt(now, 60);
+      expect(next.day, 23);
+      expect(next.hour, 0);
+      expect(next.minute, 0);
+      expect(next.second, 5);
+    });
+  });
+
   group('decodeUtf16Hex', () {
     test('解码固件返回的 SSID', () {
       expect(
@@ -83,11 +111,51 @@ void main() {
       expect(result.detail, 'success');
     });
 
-    test('ScheduleState 仅解析 enabled', () {
+    test('ScheduleState 解析 enabled 与自定义周期', () {
       final state = ScheduleState.fromMap({'enabled': true});
       expect(state.enabled, isTrue);
+      expect(state.intervalMinutes, 60);
+
+      final custom = ScheduleState.fromMap({
+        'enabled': true,
+        'intervalMinutes': 15,
+      });
+      expect(custom.intervalMinutes, 15);
+      expect(custom.copyWith(enabled: false).enabled, isFalse);
+      expect(
+        ScheduleState.fromMap({'enabled': false, 'intervalMinutes': 99999})
+            .intervalMinutes,
+        1440,
+      );
       final off = ScheduleState.fromMap({'enabled': false});
       expect(off.enabled, isFalse);
+    });
+
+    test('DeviceStatus 解析固件状态字段', () {
+      final status = DeviceStatus.fromMap({
+        'battery_percent': '60',
+        'battery_charge': '1',
+        'battery_charging': '0',
+        'signal_quality': '5',
+        'total_signal_quality': '5',
+        'rssi': '-77',
+        'wifi_clients_num': '2',
+        'run_seconds': '2482',
+      });
+      expect(status.batteryPercent, 60);
+      expect(status.hasBattery, isTrue);
+      expect(status.charging, isTrue);
+      expect(status.fullyCharged, isFalse);
+      expect(status.signalQuality, 5);
+      expect(status.signalLabel, '极好');
+      expect(status.rssi, -77);
+      expect(status.wifiClients, 2);
+      expect(status.uptimeLabel, contains('小时'));
+
+      final empty = DeviceStatus.fromMap({'result': '1', 'msg': 'api not found'});
+      expect(empty.hasBattery, isFalse);
+      expect(empty.signalLabel, '未知');
+      expect(empty.uptimeLabel, '--');
     });
   });
 
@@ -99,14 +167,31 @@ void main() {
       expect(GlassTokens.radius, greaterThan(0));
     });
 
-    test('渐变文字使用冷色令牌', () {
+    test('渐变文字默认跟随主题，可显式覆盖', () {
       final widget = GradientText(
         '1.2 MB/s',
         style: const TextStyle(fontSize: 24),
       );
       expect(widget.text, '1.2 MB/s');
-      expect(widget.colors.length, 2);
-      expect(widget.colors.first, GlassTokens.accentCyan);
+      expect(widget.colors, isNull);
+
+      final custom = GradientText(
+        '1.2 MB/s',
+        style: const TextStyle(fontSize: 24),
+        colors: const [GlassTokens.accentCyan, GlassTokens.accentBlue],
+      );
+      expect(custom.colors, hasLength(2));
+      expect(custom.colors!.first, GlassTokens.accentCyan);
+    });
+
+    test('明暗色板文字与背景对比方向正确', () {
+      expect(GlassPalette.dark.isDark, isTrue);
+      expect(GlassPalette.light.isDark, isFalse);
+      expect(GlassPalette.dark.textPrimary.computeLuminance(),
+          greaterThan(GlassPalette.dark.bgTop.computeLuminance()));
+      expect(GlassPalette.light.textPrimary.computeLuminance(),
+          lessThan(GlassPalette.light.bgTop.computeLuminance()));
+      expect(GlassPalette.light.accentBlue, isNot(GlassTokens.accentBlue));
     });
   });
 }

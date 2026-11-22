@@ -6,10 +6,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
-/** 整点执行恢复出厂设置，执行后自动排下一次。 */
+/** 按自定义周期执行恢复出厂设置，执行后自动排下一次。 */
 class AutoResetWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
         val resultText: String
@@ -37,18 +36,34 @@ class AutoResetWorker(context: Context, params: WorkerParameters) : Worker(conte
     companion object {
         const val PREFS = "wifi_auto_reset"
         const val KEY_ENABLED = "enabled"
+        const val KEY_INTERVAL_MINUTES = "interval_minutes"
+        const val DEFAULT_INTERVAL_MINUTES = 60
+        const val MIN_INTERVAL_MINUTES = 5
+        const val MAX_INTERVAL_MINUTES = 1440
+
+        // 保留原有 work 名称，确保覆盖安装后 REPLACE 能接管旧版本遗留的定时任务。
         private const val WORK_NAME = "hourly_factory_reset"
+        // 与 Dart 端倒计时保持一致：每个周期起点后 5 秒执行。
+        private const val OFFSET_MS = 5_000L
+
+        fun getIntervalMinutes(context: Context): Int {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            return prefs.getInt(KEY_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
+                .coerceIn(MIN_INTERVAL_MINUTES, MAX_INTERVAL_MINUTES)
+        }
+
+        /** 下一个周期起点 + 5 秒，按 Unix 纪元对齐，60 分钟时即为整点后 5 秒。 */
+        fun nextRunMillis(context: Context): Long {
+            val slotMs = getIntervalMinutes(context) * 60_000L
+            val now = System.currentTimeMillis()
+            return ((now / slotMs) + 1) * slotMs + OFFSET_MS
+        }
 
         fun scheduleNext(context: Context) {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!prefs.getBoolean(KEY_ENABLED, false)) return
-            val next = Calendar.getInstance().apply {
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 5)
-                set(Calendar.MILLISECOND, 0)
-                add(Calendar.HOUR_OF_DAY, 1)
-            }
-            val delay = next.timeInMillis - System.currentTimeMillis()
+            val delay = (nextRunMillis(context) - System.currentTimeMillis())
+                .coerceAtLeast(1_000L)
             val request = OneTimeWorkRequestBuilder<AutoResetWorker>()
                 .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                 .build()

@@ -59,6 +59,7 @@ class NativeBridge(
             }
 
             "deviceInfo" -> async(result) { MifiClient.deviceInfo() }
+            "statusInfo" -> async(result) { MifiClient.statusInfo() }
             "gatewayReachable" -> async(result) { MifiClient.reachable() }
 
             "factoryReset" -> {
@@ -77,22 +78,39 @@ class NativeBridge(
 
             "configureSchedule" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
+                val interval = (call.argument<Int>("intervalMinutes") ?: AutoResetWorker.DEFAULT_INTERVAL_MINUTES)
+                    .coerceIn(AutoResetWorker.MIN_INTERVAL_MINUTES, AutoResetWorker.MAX_INTERVAL_MINUTES)
                 val prefs = context.getSharedPreferences(AutoResetWorker.PREFS, Context.MODE_PRIVATE)
                 prefs.edit()
                     .putBoolean(AutoResetWorker.KEY_ENABLED, enabled)
+                    .putInt(AutoResetWorker.KEY_INTERVAL_MINUTES, interval)
                     .apply()
                 if (enabled) AutoResetWorker.scheduleNext(context) else AutoResetWorker.cancel(context)
                 AppLog.append(
                     context,
-                    LogEntry(LogEntry.now(), "定时任务", if (enabled) "开启" else "关闭", "成功", "整点执行恢复出厂"),
+                    LogEntry(
+                        LogEntry.now(),
+                        "定时任务",
+                        if (enabled) "开启" else "关闭",
+                        "成功",
+                        "每 ${interval} 分钟执行恢复出厂",
+                    ),
                 )
-                result.success(mapOf("enabled" to enabled))
+                result.success(
+                    mapOf("enabled" to enabled, "intervalMinutes" to interval),
+                )
             }
 
             "getSchedule" -> {
                 val prefs = context.getSharedPreferences(AutoResetWorker.PREFS, Context.MODE_PRIVATE)
                 result.success(
-                    mapOf("enabled" to prefs.getBoolean(AutoResetWorker.KEY_ENABLED, false)),
+                    mapOf(
+                        "enabled" to prefs.getBoolean(AutoResetWorker.KEY_ENABLED, false),
+                        "intervalMinutes" to prefs.getInt(
+                            AutoResetWorker.KEY_INTERVAL_MINUTES,
+                            AutoResetWorker.DEFAULT_INTERVAL_MINUTES,
+                        ),
+                    ),
                 )
             }
 

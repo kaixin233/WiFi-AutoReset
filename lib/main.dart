@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 
 import 'screens/automation_screen.dart';
@@ -10,6 +8,56 @@ import 'widgets/glass.dart';
 
 void main() => runApp(const WifiAutoResetApp());
 
+ThemeData _buildTheme(Brightness brightness, GlassPalette palette) {
+  final isDark = brightness == Brightness.dark;
+  return ThemeData(
+    brightness: brightness,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: palette.accentBlue,
+      brightness: brightness,
+    ),
+    scaffoldBackgroundColor: Colors.transparent,
+    useMaterial3: true,
+    dividerColor: palette.divider,
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: TextStyle(
+        color: palette.textPrimary,
+        fontSize: 19,
+        fontWeight: FontWeight.w600,
+      ),
+      iconTheme: IconThemeData(color: palette.textPrimary),
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: isDark ? const Color(0xFF161E3E) : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: TextStyle(
+        color: palette.textPrimary,
+        fontSize: 19,
+        fontWeight: FontWeight.w600,
+      ),
+      contentTextStyle: TextStyle(
+        color: palette.textMuted,
+        fontSize: 14,
+        height: 1.5,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: isDark ? const Color(0xFF202A52) : Colors.white,
+      contentTextStyle: TextStyle(color: palette.textPrimary),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+    textTheme: TextTheme(
+      bodyLarge: TextStyle(color: palette.textPrimary),
+      bodyMedium: TextStyle(color: palette.textPrimary),
+    ),
+  );
+}
+
 class WifiAutoResetApp extends StatelessWidget {
   const WifiAutoResetApp({super.key});
 
@@ -18,53 +66,18 @@ class WifiAutoResetApp extends StatelessWidget {
     return MaterialApp(
       title: 'WiFi 自动重置',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: GlassTokens.accentBlue,
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: GlassTokens.bgBottom,
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0x1A0B1024),
-          surfaceTintColor: Colors.transparent,
-          titleTextStyle: TextStyle(
-            color: GlassTokens.textPrimary,
-            fontSize: 19,
-            fontWeight: FontWeight.w600,
-          ),
-          iconTheme: IconThemeData(color: GlassTokens.textPrimary),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: const Color(0xFF161E3E),
-          surfaceTintColor: Colors.transparent,
-          titleTextStyle: const TextStyle(
-            color: GlassTokens.textPrimary,
-            fontSize: 19,
-            fontWeight: FontWeight.w600,
-          ),
-          contentTextStyle: const TextStyle(
-            color: GlassTokens.textMuted,
-            fontSize: 14,
-            height: 1.5,
-          ),
-        ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: const Color(0xFF202A52),
-          contentTextStyle: const TextStyle(color: GlassTokens.textPrimary),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: GlassTokens.textPrimary),
-          bodyMedium: TextStyle(color: GlassTokens.textPrimary),
-        ),
-      ),
+      themeMode: ThemeMode.system,
+      theme: _buildTheme(Brightness.light, GlassPalette.light),
+      darkTheme: _buildTheme(Brightness.dark, GlassPalette.dark),
+      builder: (context, child) {
+        final brightness = Theme.of(context).brightness;
+        return GlassTheme(
+          palette: brightness == Brightness.dark
+              ? GlassPalette.dark
+              : GlassPalette.light,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const MainShell(),
     );
   }
@@ -110,88 +123,12 @@ class _MainShellState extends State<MainShell> {
       body: LiquidBackdrop(
         child: IndexedStack(index: _index, children: _pages),
       ),
-      bottomNavigationBar: _buildNavBar(),
-    );
-  }
-
-  Widget _buildNavBar() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Colors.white.withValues(alpha: 0.09),
-                border: Border.all(
-                  color: const Color(0x3DFFFFFF),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(_labels.length, _buildNavItem),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int i) {
-    final selected = i == _index;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => setState(() => _index = i),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: selected
-                  ? GlassTokens.accentBlue.withValues(alpha: 0.24)
-                  : Colors.transparent,
-              border: selected
-                  ? Border.all(
-                      color: GlassTokens.accentCyan.withValues(alpha: 0.55),
-                      width: 1,
-                    )
-                  : null,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  selected ? _activeIcons[i] : _icons[i],
-                  size: 21,
-                  color: selected
-                      ? GlassTokens.accentCyan
-                      : GlassTokens.textMuted,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _labels[i],
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: selected
-                        ? GlassTokens.textPrimary
-                        : GlassTokens.textMuted,
-                    fontWeight:
-                        selected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      bottomNavigationBar: LiquidGlassNavBar(
+        currentIndex: _index,
+        icons: _icons,
+        activeIcons: _activeIcons,
+        labels: _labels,
+        onTap: (index) => setState(() => _index = index),
       ),
     );
   }

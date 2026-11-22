@@ -71,6 +71,12 @@ object MifiClient {
 
     fun deviceInfo(): String = request("homepage_info", "GET", null)
 
+    /**
+     * 只读实时状态：电量百分比、充电状态、蜂窝信号等级、RSSI、在线设备数、运行时长。
+     * 对应固件首页的 json_status_info，不含任何写操作。
+     */
+    fun statusInfo(): String = request("status_info", "GET", null)
+
     /** 真·恢复出厂设置：固件中 lt_rm_btnResetFactory 对应的 json_device_restore_factory。 */
     fun factoryReset(): String = request("device_restore_factory", "GET", null)
 

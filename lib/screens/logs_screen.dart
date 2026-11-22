@@ -31,6 +31,7 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _clear() async {
+    final palette = context.glass;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -43,7 +44,7 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: GlassTokens.danger,
+              backgroundColor: palette.danger,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -59,6 +60,7 @@ class _LogsScreenState extends State<LogsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.glass;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -83,13 +85,13 @@ class _LogsScreenState extends State<LogsScreen> {
                         Icon(
                           Icons.history,
                           size: 52,
-                          color: GlassTokens.textMuted.withValues(alpha: 0.5),
+                          color: palette.textMuted.withValues(alpha: 0.5),
                         ),
                         const SizedBox(height: 16),
-                        const Center(
+                        Center(
                           child: Text(
                             '暂无执行记录',
-                            style: TextStyle(color: GlassTokens.textMuted),
+                            style: TextStyle(color: palette.textMuted),
                           ),
                         ),
                       ],
@@ -105,7 +107,8 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Widget _buildLogCard(LogEntry entry) {
-    final color = entry.isFailure ? GlassTokens.danger : GlassTokens.success;
+    final palette = context.glass;
+    final color = entry.isFailure ? palette.danger : palette.success;
     final icon = entry.isFailure ? Icons.error_outline : Icons.check_circle;
     return GlassCard(
       padding: const EdgeInsets.all(14),
@@ -134,9 +137,9 @@ class _LogsScreenState extends State<LogsScreen> {
                     Expanded(
                       child: Text(
                         '${entry.action} · ${entry.result}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: GlassTokens.textPrimary,
+                          color: palette.textPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -148,14 +151,11 @@ class _LogsScreenState extends State<LogsScreen> {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(6),
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: palette.surfaceFill,
                       ),
                       child: Text(
                         entry.mode,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: GlassTokens.textMuted,
-                        ),
+                        style: TextStyle(fontSize: 10, color: palette.textMuted),
                       ),
                     ),
                   ],
@@ -163,18 +163,12 @@ class _LogsScreenState extends State<LogsScreen> {
                 const SizedBox(height: 5),
                 Text(
                   entry.time,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: GlassTokens.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: palette.textMuted),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   entry.detail,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: GlassTokens.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11.5, color: palette.textMuted),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),

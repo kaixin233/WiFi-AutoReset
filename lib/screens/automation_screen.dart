@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../services/native_bridge.dart';
+import '../utils/format.dart';
 import '../widgets/glass.dart';
 
 class AutomationScreen extends StatefulWidget {
@@ -18,6 +19,8 @@ class _AutomationScreenState extends State<AutomationScreen> {
   bool _loading = true;
   Timer? _ticker;
   DateTime _now = DateTime.now();
+
+  static const List<int> _presets = [15, 30, 60, 120, 360, 720];
 
   @override
   void initState() {
@@ -47,30 +50,31 @@ class _AutomationScreenState extends State<AutomationScreen> {
   Future<void> _save() async {
     final state = await NativeBridge.configureSchedule(
       enabled: _state.enabled,
+      intervalMinutes: _state.intervalMinutes,
     );
     if (!mounted) return;
     setState(() => _state = state);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          state.enabled ? '定时任务已开启，整点自动执行' : '定时任务已关闭',
+          state.enabled
+              ? '定时任务已开启：$_intervalLabel'
+              : '定时任务已关闭',
         ),
       ),
     );
   }
 
-  /// 下一个整点第 0 分 05 秒（与原生 Worker 的排程保持一致）。
-  DateTime get _nextRun {
-    final next = DateTime(
-      _now.year,
-      _now.month,
-      _now.day,
-      _now.hour + 1,
-      0,
-      5,
-    );
-    return next;
+  String get _intervalLabel {
+    final minutes = _state.intervalMinutes;
+    if (minutes == 1440) return '每天';
+    if (minutes >= 60 && minutes % 60 == 0) return '每 ${minutes ~/ 60} 小时';
+    return '每 $minutes 分钟';
   }
+
+  /// 与原生 AutoResetWorker.nextRunMillis 完全一致：
+  /// 按 Unix 纪元对齐到周期起点，再加 5 秒。
+  DateTime get _nextRun => nextRunAt(_now, _state.intervalMinutes);
 
   String get _countdown {
     final diff = _nextRun.difference(_now);
@@ -83,8 +87,58 @@ class _AutomationScreenState extends State<AutomationScreen> {
         '${seconds.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _pickCustomInterval() async {
+    final palette = context.glass;
+    final controller = TextEditingController(
+      text: _state.intervalMinutes.toString(),
+    );
+    final value = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('自定义执行周期'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '间隔（分钟）',
+            hintText: '5 ~ 1440',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: palette.accentBlue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final parsed = int.tryParse(controller.text.trim());
+              if (parsed == null || parsed < 5 || parsed > 1440) {
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入 5 ~ 1440 之间的分钟数')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, parsed);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (value == null || !mounted) return;
+    setState(() => _state = _state.copyWith(intervalMinutes: value));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = context.glass;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('自动化')),
@@ -99,17 +153,14 @@ class _AutomationScreenState extends State<AutomationScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(
-                            Icons.schedule,
-                            size: 20,
-                            color: GlassTokens.accentCyan,
-                          ),
+                          Icon(Icons.schedule,
+                              size: 20, color: palette.accentCyan),
                           const SizedBox(width: 8),
-                          const Text(
-                            '整点自动恢复出厂',
+                          Text(
+                            '定时自动恢复出厂',
                             style: TextStyle(
                               fontSize: 16,
-                              color: GlassTokens.textPrimary,
+                              color: palette.textPrimary,
                             ),
                           ),
                           const Spacer(),
@@ -117,33 +168,34 @@ class _AutomationScreenState extends State<AutomationScreen> {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        '每小时第 0 分 05 秒执行一次',
+                      Text(
+                        '$_intervalLabel · 周期起点后 5 秒执行',
                         style: TextStyle(
                           fontSize: 12,
-                          color: GlassTokens.textMuted,
+                          color: palette.textMuted,
                         ),
                       ),
                       const SizedBox(height: 14),
                       _buildCountdown(),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text(
+                        title: Text(
                           '启用定时任务',
-                          style: TextStyle(color: GlassTokens.textPrimary),
+                          style: TextStyle(color: palette.textPrimary),
                         ),
-                        subtitle: const Text(
+                        subtitle: Text(
                           '由 WorkManager 调度，执行后自动排下一次',
                           style: TextStyle(
                             fontSize: 11,
-                            color: GlassTokens.textMuted,
+                            color: palette.textMuted,
                           ),
                         ),
                         value: _state.enabled,
-                        activeThumbColor: GlassTokens.accentCyan,
-                        onChanged: (value) =>
-                            setState(() => _state = ScheduleState(enabled: value)),
+                        activeThumbColor: palette.accentCyan,
+                        onChanged: (value) => setState(
+                          () => _state = _state.copyWith(enabled: value),
+                        ),
                       ),
                     ],
                   ),
@@ -153,19 +205,63 @@ class _AutomationScreenState extends State<AutomationScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 20,
-                            color: GlassTokens.accentBlue,
+                          Icon(Icons.timelapse,
+                              size: 20, color: palette.accentPurple),
+                          const SizedBox(width: 8),
+                          Text(
+                            '执行周期',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: palette.textPrimary,
+                            ),
                           ),
-                          SizedBox(width: 8),
+                          const Spacer(),
+                          GradientText(
+                            _intervalLabel,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ..._presets.map(_buildPresetChip),
+                          _buildCustomChip(),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '周期为 60 分钟时按整点执行；修改后需点击「保存设置」生效。',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 20, color: palette.accentBlue),
+                          const SizedBox(width: 8),
                           Text(
                             '执行说明',
                             style: TextStyle(
                               fontSize: 16,
-                              color: GlassTokens.textPrimary,
+                              color: palette.textPrimary,
                             ),
                           ),
                         ],
@@ -178,10 +274,10 @@ class _AutomationScreenState extends State<AutomationScreen> {
                         '无法保证毫秒级准点。\n'
                         '• 每次执行结果都会写入「日志」页，'
                         '成功与失败均可追溯。',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
                           height: 1.7,
-                          color: GlassTokens.textMuted,
+                          color: palette.textMuted,
                         ),
                       ),
                     ],
@@ -192,7 +288,7 @@ class _AutomationScreenState extends State<AutomationScreen> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: GlassTokens.accentBlue,
+                      backgroundColor: palette.accentBlue,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -209,43 +305,80 @@ class _AutomationScreenState extends State<AutomationScreen> {
     );
   }
 
+  Widget _buildPresetChip(int minutes) {
+    final palette = context.glass;
+    final selected = _state.intervalMinutes == minutes;
+    return ChoiceChip(
+      label: Text(
+        minutes >= 60 ? '${minutes ~/ 60} 小时' : '$minutes 分',
+        style: TextStyle(
+          fontSize: 12,
+          color: selected ? Colors.white : palette.textMuted,
+        ),
+      ),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) =>
+          setState(() => _state = _state.copyWith(intervalMinutes: minutes)),
+      selectedColor: palette.accentBlue,
+      backgroundColor: palette.surfaceFill,
+      side: BorderSide(color: palette.divider),
+    );
+  }
+
+  Widget _buildCustomChip() {
+    final palette = context.glass;
+    final isPreset = _presets.contains(_state.intervalMinutes);
+    return ChoiceChip(
+      avatar: Icon(Icons.tune, size: 14, color: palette.textMuted),
+      label: Text(
+        isPreset ? '自定义' : '${_state.intervalMinutes} 分',
+        style: TextStyle(
+          fontSize: 12,
+          color: palette.textMuted,
+        ),
+      ),
+      selected: !isPreset,
+      showCheckmark: false,
+      onSelected: (_) => _pickCustomInterval(),
+      backgroundColor: palette.surfaceFill,
+      side: BorderSide(color: palette.divider),
+    );
+  }
+
   Widget _buildStatusBadge() {
+    final palette = context.glass;
     final on = _state.enabled;
+    final color = on ? palette.success : palette.textMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: (on ? GlassTokens.success : GlassTokens.textMuted)
-            .withValues(alpha: 0.14),
-        border: Border.all(
-          color: (on ? GlassTokens.success : GlassTokens.textMuted)
-              .withValues(alpha: 0.4),
-        ),
+        color: color.withValues(alpha: 0.14),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         on ? '运行中' : '已关闭',
-        style: TextStyle(
-          fontSize: 11,
-          color: on ? GlassTokens.success : GlassTokens.textMuted,
-        ),
+        style: TextStyle(fontSize: 11, color: color),
       ),
     );
   }
 
   Widget _buildCountdown() {
+    final palette = context.glass;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: Colors.white.withValues(alpha: 0.05),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        color: palette.surfaceFill,
+        border: Border.all(color: palette.divider),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             '距离下次执行',
-            style: TextStyle(fontSize: 12, color: GlassTokens.textMuted),
+            style: TextStyle(fontSize: 12, color: palette.textMuted),
           ),
           GradientText(
             _state.enabled ? _countdown : '--:--:--',

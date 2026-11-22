@@ -55,6 +55,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   Future<void> _resetFromApp() async {
+    final palette = context.glass;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -69,7 +70,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: GlassTokens.danger,
+              backgroundColor: palette.danger,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -88,6 +89,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.glass;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -108,8 +110,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
               children: [
                 WebViewWidget(controller: _controller),
                 if (_loading)
-                  const LinearProgressIndicator(
-                    color: GlassTokens.accentCyan,
+                  LinearProgressIndicator(
+                    color: palette.accentCyan,
                     backgroundColor: Colors.transparent,
                   ),
               ],
@@ -122,25 +124,24 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   Widget _buildToolbar() {
+    final palette = context.glass;
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 96),
           decoration: BoxDecoration(
-            color: GlassTokens.bgBottom.withValues(alpha: 0.55),
-            border: const Border(
-              top: BorderSide(color: Color(0x2EFFFFFF), width: 1),
-            ),
+            color: palette.bgBottom.withValues(alpha: 0.72),
+            border: Border(top: BorderSide(color: palette.cardBorder, width: 1)),
           ),
           child: Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: GlassTokens.accentCyan,
+                    foregroundColor: palette.accentCyan,
                     side: BorderSide(
-                      color: GlassTokens.accentCyan.withValues(alpha: 0.5),
+                      color: palette.accentCyan.withValues(alpha: 0.5),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -156,7 +157,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
               Expanded(
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: GlassTokens.danger,
+                    backgroundColor: palette.danger,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

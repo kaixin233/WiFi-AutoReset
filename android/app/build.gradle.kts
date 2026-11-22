@@ -22,6 +22,9 @@ android {
             // CI 无正式 keystore，使用 AGP 内置 debug 签名（默认含 V1+V2 签名块），
             // 确保产出的 APK 可被 MIUI 等国产 ROM 正确解析安装，
             // 否则会报 "解析软件包时出现问题 (33) / packageinfo is null"。
+            //
+            // 覆盖安装依赖：包名不变 + 签名证书不变 + versionCode 递增。
+            // 请勿在版本迭代中途更换签名方式，否则系统会拒绝覆盖安装。
             signingConfig = signingConfigs.getByName("debug")
         }
     }

@@ -17,9 +17,11 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic> _foreground = const <String, dynamic>{};
   Map<String, dynamic> _device = const <String, dynamic>{};
+  DeviceStatus _status = const DeviceStatus();
   bool _gatewayOk = false;
   bool _hasUsageAccess = false;
   Timer? _timer;
+  Timer? _statusTimer;
 
   @override
   void initState() {
@@ -28,11 +30,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _timer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (_hasUsageAccess) await _refreshForeground();
     });
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _refreshStatus(),
+    );
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _statusTimer?.cancel();
     super.dispose();
   }
 
@@ -41,7 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) return;
     setState(() => _hasUsageAccess = access);
     if (access) await _refreshForeground();
-    await _refreshDevice();
+    await Future.wait([_refreshDevice(), _refreshStatus()]);
     final reachable = await NativeBridge.gatewayReachable();
     if (!mounted) return;
     setState(() => _gatewayOk = reachable);
@@ -57,11 +64,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) setState(() => _device = map);
   }
 
+  Future<void> _refreshStatus() async {
+    final status = await NativeBridge.statusInfo();
+    if (mounted) setState(() => _status = status);
+  }
+
   Future<void> _execute(
     String title,
     String warning,
     Future<ActionResult> Function() action,
   ) async {
+    final palette = context.glass;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -74,7 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: GlassTokens.danger,
+              backgroundColor: palette.danger,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -88,9 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '${result.ok ? "已执行" : "执行失败"}：${result.detail}',
-        ),
+        content: Text('${result.ok ? "已执行" : "执行失败"}：${result.detail}'),
       ),
     );
     await _refresh();
@@ -119,6 +130,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             _buildSpeedCard(),
             const SizedBox(height: 14),
+            _buildStatusCard(),
+            const SizedBox(height: 14),
             _buildForegroundCard(),
             const SizedBox(height: 14),
             _buildDeviceCard(ssid),
@@ -131,17 +144,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSpeedCard() {
+    final palette = context.glass;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.speed, size: 20, color: GlassTokens.accentCyan),
+              Icon(Icons.speed, size: 20, color: palette.accentCyan),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 '实时网速',
-                style: TextStyle(fontSize: 16, color: GlassTokens.textPrimary),
+                style: TextStyle(fontSize: 16, color: palette.textPrimary),
               ),
               const Spacer(),
               _buildGatewayChip(),
@@ -154,32 +168,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final data = snapshot.data ?? const <String, dynamic>{};
               final rx = data['rx'] is int ? data['rx'] as int : 0;
               final tx = data['tx'] is int ? data['tx'] as int : 0;
+              final localPalette = context.glass;
               return Row(
                 children: [
                   Expanded(
                     child: _speedValue(
                       '下载',
                       formatSpeed(rx),
-                      const [
-                        GlassTokens.accentCyan,
-                        GlassTokens.accentBlue,
-                      ],
+                      [localPalette.accentCyan, localPalette.accentBlue],
                       Icons.arrow_downward,
                     ),
                   ),
                   Container(
                     width: 1,
                     height: 46,
-                    color: Colors.white.withValues(alpha: 0.14),
+                    color: localPalette.divider,
                   ),
                   Expanded(
                     child: _speedValue(
                       '上传',
                       formatSpeed(tx),
-                      const [
-                        GlassTokens.accentPurple,
-                        GlassTokens.accentBlue,
-                      ],
+                      [localPalette.accentPurple, localPalette.accentBlue],
                       Icons.arrow_upward,
                     ),
                   ),
@@ -193,16 +202,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildGatewayChip() {
+    final palette = context.glass;
+    final okColor = _gatewayOk ? palette.success : palette.danger;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: (_gatewayOk ? GlassTokens.success : GlassTokens.danger)
-            .withValues(alpha: 0.14),
-        border: Border.all(
-          color: (_gatewayOk ? GlassTokens.success : GlassTokens.danger)
-              .withValues(alpha: 0.45),
-        ),
+        color: okColor.withValues(alpha: 0.14),
+        border: Border.all(color: okColor.withValues(alpha: 0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -210,15 +217,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Icon(
             _gatewayOk ? Icons.check_circle : Icons.error_outline,
             size: 14,
-            color: _gatewayOk ? GlassTokens.success : GlassTokens.danger,
+            color: okColor,
           ),
           const SizedBox(width: 5),
           Text(
             _gatewayOk ? '网关在线' : '网关不可达',
-            style: TextStyle(
-              fontSize: 11,
-              color: _gatewayOk ? GlassTokens.success : GlassTokens.danger,
-            ),
+            style: TextStyle(fontSize: 11, color: okColor),
           ),
         ],
       ),
@@ -231,21 +235,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<Color> gradient,
     IconData arrow,
   ) {
+    final palette = context.glass;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(arrow, size: 13, color: GlassTokens.textMuted),
+            Icon(arrow, size: 13, color: palette.textMuted),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: GlassTokens.textMuted,
-              ),
-            ),
+            Text(label, style: TextStyle(fontSize: 12, color: palette.textMuted)),
           ],
         ),
         const SizedBox(height: 6),
@@ -262,20 +261,236 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// 电量 / 信号 / 运营商状态卡，数据来自固件 json_status_info（只读）。
+  Widget _buildStatusCard() {
+    final palette = context.glass;
+    final carrier = _device['network_name']?.toString() ?? '';
+    final chargingText = _status.fullyCharged
+        ? '已充满'
+        : _status.charging
+            ? '充电中'
+            : '未充电';
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.battery_charging_full,
+                  size: 20, color: palette.accentPurple),
+              const SizedBox(width: 8),
+              Text(
+                '设备状态',
+                style: TextStyle(fontSize: 16, color: palette.textPrimary),
+              ),
+              const Spacer(),
+              Text(
+                '实时',
+                style: TextStyle(fontSize: 11, color: palette.textMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _batteryBlock(palette, chargingText),
+              ),
+              Container(width: 1, height: 58, color: palette.divider),
+              Expanded(child: _signalBlock(palette)),
+              Container(width: 1, height: 58, color: palette.divider),
+              Expanded(
+                child: _carrierBlock(palette, carrier),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: palette.surfaceFill,
+              border: Border.all(color: palette.divider),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.devices_other, size: 14, color: palette.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  '在线 ${_status.wifiClients} 台',
+                  style: TextStyle(fontSize: 11.5, color: palette.textPrimary),
+                ),
+                const Spacer(),
+                Icon(Icons.schedule, size: 14, color: palette.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  '已运行 ${_status.uptimeLabel}',
+                  style: TextStyle(fontSize: 11.5, color: palette.textPrimary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _batteryBlock(GlassPalette palette, String chargingText) {
+    final percent = _status.hasBattery ? _status.batteryPercent : 0;
+    final color = percent <= 15
+        ? palette.danger
+        : percent <= 40
+            ? palette.warn
+            : palette.success;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.battery_full, size: 13, color: palette.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              '电量',
+              style: TextStyle(fontSize: 11, color: palette.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        GradientText(
+          _status.hasBattery ? '$percent%' : '--',
+          colors: [color, palette.accentBlue],
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(height: 7),
+        Container(
+          height: 5,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(3),
+            color: palette.divider,
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: _status.hasBattery ? percent / 100 : 0,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                gradient: LinearGradient(colors: [color, palette.accentBlue]),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          chargingText,
+          style: TextStyle(fontSize: 10.5, color: palette.textMuted),
+        ),
+      ],
+    );
+  }
+
+  Widget _signalBlock(GlassPalette palette) {
+    final level = _status.hasSignal
+        ? _status.signalQuality.clamp(0, _status.totalSignalQuality)
+        : 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.signal_cellular_alt,
+                size: 13, color: palette.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              '信号',
+              style: TextStyle(fontSize: 11, color: palette.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 20,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(5, (i) {
+              final active = i < level;
+              return Container(
+                width: 4,
+                height: 6.0 + i * 2.8,
+                margin: const EdgeInsets.only(right: 3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  color: active
+                      ? palette.accentCyan
+                      : palette.textMuted.withValues(alpha: 0.28),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${_status.signalLabel}${_status.rssi != 0 ? " · ${_status.rssi} dBm" : ""}',
+          style: TextStyle(fontSize: 10.5, color: palette.textMuted),
+        ),
+      ],
+    );
+  }
+
+  Widget _carrierBlock(GlassPalette palette, String carrier) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.cell_wifi, size: 13, color: palette.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              '运营商',
+              style: TextStyle(fontSize: 11, color: palette.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 13),
+        Text(
+          carrier.isEmpty ? '--' : carrier,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: palette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '蜂窝网络',
+          style: TextStyle(fontSize: 10.5, color: palette.textMuted),
+        ),
+      ],
+    );
+  }
+
   Widget _buildForegroundCard() {
+    final palette = context.glass;
     final pkg = _foreground['package']?.toString() ?? '';
     final label = _foreground['label']?.toString() ?? '未知';
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.apps, size: 20, color: GlassTokens.accentPurple),
-              SizedBox(width: 8),
+              Icon(Icons.apps, size: 20, color: palette.accentPurple),
+              const SizedBox(width: 8),
               Text(
                 '前台应用',
-                style: TextStyle(fontSize: 16, color: GlassTokens.textPrimary),
+                style: TextStyle(fontSize: 16, color: palette.textPrimary),
               ),
             ],
           ),
@@ -284,14 +499,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '需要「使用情况访问」权限才能读取前台包名。',
-                  style: TextStyle(color: GlassTokens.textMuted, fontSize: 13),
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 FilledButton(
                   style: FilledButton.styleFrom(
-                    backgroundColor: GlassTokens.accentBlue,
+                    backgroundColor: palette.accentBlue,
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
@@ -308,26 +523,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
-                    color: GlassTokens.textPrimary,
+                    color: palette.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 5),
                 SelectableText(
                   pkg.isEmpty ? '暂无前台应用' : pkg,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: GlassTokens.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 12, color: palette.textMuted),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   '更新于 ${_foreground['time'] ?? '--'}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: GlassTokens.textMuted.withValues(alpha: 0.7),
+                    color: palette.textMuted.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -338,6 +550,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDeviceCard(String ssid) {
+    final palette = context.glass;
     final rows = <List<String>>[
       ['设备型号', _device['device_name']?.toString() ?? '--'],
       ['固件版本', _device['sw_version']?.toString() ?? '--'],
@@ -351,13 +564,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.router, size: 20, color: GlassTokens.accentBlue),
-              SizedBox(width: 8),
+              Icon(Icons.router, size: 20, color: palette.accentBlue),
+              const SizedBox(width: 8),
               Text(
                 '设备信息',
-                style: TextStyle(fontSize: 16, color: GlassTokens.textPrimary),
+                style: TextStyle(fontSize: 16, color: palette.textPrimary),
               ),
             ],
           ),
@@ -371,18 +584,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     width: 78,
                     child: Text(
                       row[0],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: GlassTokens.textMuted,
-                      ),
+                      style: TextStyle(fontSize: 12, color: palette.textMuted),
                     ),
                   ),
                   Expanded(
                     child: SelectableText(
                       row[1],
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: GlassTokens.textPrimary,
+                        color: palette.textPrimary,
                       ),
                     ),
                   ),
@@ -396,24 +606,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildActionsCard() {
+    final palette = context.glass;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.bolt, size: 20, color: GlassTokens.warn),
-              SizedBox(width: 8),
+              Icon(Icons.bolt, size: 20, color: palette.warn),
+              const SizedBox(width: 8),
               Text(
                 '设备操作',
-                style: TextStyle(fontSize: 16, color: GlassTokens.textPrimary),
+                style: TextStyle(fontSize: 16, color: palette.textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 10),
           _actionTile(
             icon: Icons.restore,
-            color: GlassTokens.danger,
+            color: palette.danger,
             title: '恢复出厂设置',
             subtitle: '清空全部配置并重启，会改变 WiFi 名称与密码',
             onTap: () => _execute(
@@ -425,7 +636,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _divider(),
           _actionTile(
             icon: Icons.restart_alt,
-            color: GlassTokens.warn,
+            color: palette.warn,
             title: '重启设备',
             subtitle: '保留配置，重新拨号联网',
             onTap: () => _execute(
@@ -437,7 +648,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _divider(),
           _actionTile(
             icon: Icons.data_usage,
-            color: GlassTokens.accentCyan,
+            color: palette.accentCyan,
             title: '重置流量统计',
             subtitle: '只清零流量计数，不改变任何配置',
             onTap: () => _execute(
@@ -453,7 +664,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _divider() => Container(
         height: 1,
-        color: Colors.white.withValues(alpha: 0.10),
+        color: context.glass.divider,
       );
 
   Widget _actionTile({
@@ -463,6 +674,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final palette = context.glass;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -486,24 +698,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: GlassTokens.textPrimary,
+                      color: palette.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: GlassTokens.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 11, color: palette.textMuted),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: GlassTokens.textMuted, size: 18),
+            Icon(Icons.chevron_right,
+                color: palette.textMuted, size: 18),
           ],
         ),
       ),
