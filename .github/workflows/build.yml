@@ -30,7 +30,9 @@ jobs:
           yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Ensure Android platform files
-        run: flutter create --platforms=android .
+        run: |
+          flutter create --platforms=android .
+          rm -f test/widget_test.dart
 
       - name: Fetch packages
         run: flutter pub get
