@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../services/native_bridge.dart';
+import '../widgets/glass.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -41,6 +42,10 @@ class _LogsScreenState extends State<LogsScreen> {
             child: const Text('取消'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: GlassTokens.danger,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('清空'),
           ),
@@ -55,14 +60,16 @@ class _LogsScreenState extends State<LogsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('执行日志'),
         actions: [
-          IconButton(
-            onPressed: _clear,
-            icon: const Icon(Icons.delete_outline),
+          GlassIconButton(
+            icon: Icons.delete_outline,
             tooltip: '清空',
+            onTap: _clear,
           ),
+          const SizedBox(width: 10),
         ],
       ),
       body: _loading
@@ -71,46 +78,111 @@ class _LogsScreenState extends State<LogsScreen> {
               onRefresh: _load,
               child: _logs.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
-                        Center(
+                      children: [
+                        const SizedBox(height: 140),
+                        Icon(
+                          Icons.history,
+                          size: 52,
+                          color: GlassTokens.textMuted.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 16),
+                        const Center(
                           child: Text(
                             '暂无执行记录',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: GlassTokens.textMuted),
                           ),
                         ),
                       ],
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                       itemCount: _logs.length,
-                      itemBuilder: (context, index) {
-                        final entry = _logs[index];
-                        final color = entry.isFailure
-                            ? Colors.red.shade100
-                            : entry.isDryRun
-                                ? Colors.grey.shade200
-                                : Colors.green.shade100;
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: color,
-                            child: Icon(
-                              entry.isFailure
-                                  ? Icons.error_outline
-                                  : entry.isDryRun
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.check,
-                              size: 18,
-                            ),
-                          ),
-                          title: Text('${entry.action} · ${entry.result}'),
-                          subtitle: Text(
-                            '${entry.time}  [${entry.mode}]\n${entry.detail}',
-                          ),
-                          isThreeLine: true,
-                        );
-                      },
+                      itemBuilder: (context, index) =>
+                          _buildLogCard(_logs[index]),
                     ),
             ),
+    );
+  }
+
+  Widget _buildLogCard(LogEntry entry) {
+    final color = entry.isFailure ? GlassTokens.danger : GlassTokens.success;
+    final icon = entry.isFailure ? Icons.error_outline : Icons.check_circle;
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
+      radius: 16,
+      blur: 10,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(11),
+              color: color.withValues(alpha: 0.15),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${entry.action} · ${entry.result}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: GlassTokens.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                      child: Text(
+                        entry.mode,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: GlassTokens.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  entry.time,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: GlassTokens.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  entry.detail,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: GlassTokens.textMuted,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

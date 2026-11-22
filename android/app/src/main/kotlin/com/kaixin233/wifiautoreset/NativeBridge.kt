@@ -62,45 +62,37 @@ class NativeBridge(
             "gatewayReachable" -> async(result) { MifiClient.reachable() }
 
             "factoryReset" -> {
-                val dryRun = call.argument<Boolean>("dryRun") ?: true
                 async(result) {
-                    performAction("恢复出厂设置", dryRun) { MifiClient.factoryReset() }
+                    performAction("恢复出厂设置") { MifiClient.factoryReset() }
                 }
             }
 
             "reboot" -> {
-                val dryRun = call.argument<Boolean>("dryRun") ?: true
-                async(result) { performAction("重启设备", dryRun) { MifiClient.reboot() } }
+                async(result) { performAction("重启设备") { MifiClient.reboot() } }
             }
 
             "resetTraffic" -> {
-                val dryRun = call.argument<Boolean>("dryRun") ?: true
-                async(result) { performAction("重置流量统计", dryRun) { MifiClient.resetTraffic() } }
+                async(result) { performAction("重置流量统计") { MifiClient.resetTraffic() } }
             }
 
             "configureSchedule" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
-                val dryRun = call.argument<Boolean>("dryRun") ?: true
                 val prefs = context.getSharedPreferences(AutoResetWorker.PREFS, Context.MODE_PRIVATE)
                 prefs.edit()
                     .putBoolean(AutoResetWorker.KEY_ENABLED, enabled)
-                    .putBoolean(AutoResetWorker.KEY_DRY_RUN, dryRun)
                     .apply()
                 if (enabled) AutoResetWorker.scheduleNext(context) else AutoResetWorker.cancel(context)
                 AppLog.append(
                     context,
-                    LogEntry(LogEntry.now(), "定时任务", if (enabled) "开启" else "关闭", "成功", "dryRun=$dryRun"),
+                    LogEntry(LogEntry.now(), "定时任务", if (enabled) "开启" else "关闭", "成功", "整点执行恢复出厂"),
                 )
-                result.success(mapOf("enabled" to enabled, "dryRun" to dryRun))
+                result.success(mapOf("enabled" to enabled))
             }
 
             "getSchedule" -> {
                 val prefs = context.getSharedPreferences(AutoResetWorker.PREFS, Context.MODE_PRIVATE)
                 result.success(
-                    mapOf(
-                        "enabled" to prefs.getBoolean(AutoResetWorker.KEY_ENABLED, false),
-                        "dryRun" to prefs.getBoolean(AutoResetWorker.KEY_DRY_RUN, true),
-                    ),
+                    mapOf("enabled" to prefs.getBoolean(AutoResetWorker.KEY_ENABLED, false)),
                 )
             }
 
@@ -125,19 +117,15 @@ class NativeBridge(
         }
     }
 
-    private fun performAction(name: String, dryRun: Boolean, call: () -> String): Map<String, Any> {
-        if (dryRun) {
-            AppLog.append(context, LogEntry(LogEntry.now(), name, "手动", "演练", "未发送请求"))
-            return mapOf("ok" to true, "dryRun" to true, "detail" to "演练模式：未发送请求")
-        }
+    private fun performAction(name: String, call: () -> String): Map<String, Any> {
         return try {
             val body = call()
             AppLog.append(context, LogEntry(LogEntry.now(), name, "手动", "已发送", body.take(300)))
-            mapOf("ok" to true, "dryRun" to false, "detail" to body.take(300))
+            mapOf("ok" to true, "detail" to body.take(300))
         } catch (e: Exception) {
             val message = e.message ?: "未知异常"
             AppLog.append(context, LogEntry(LogEntry.now(), name, "手动", "失败", message))
-            mapOf("ok" to false, "dryRun" to false, "detail" to message)
+            mapOf("ok" to false, "detail" to message)
         }
     }
 

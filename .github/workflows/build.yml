@@ -76,12 +76,17 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: WiFi 自动重置 v1.0.0
+          tag_name: v1.0.1
+          name: WiFi 自动重置 v1.0.1（液体玻璃版）
           body: |
-            ## WiFi 自动重置 v1.0.0
+            ## WiFi 自动重置 v1.0.1
 
             面向小米手机（Android 16、64 位）的随身 WiFi 自动化控制 App。
+
+            ### 本次更新（v1.0.1）
+            - **移除演练模式**：所有操作点击并二次确认后真实执行（实机已验证恢复出厂可用）
+            - **液体玻璃 UI**：毛玻璃卡片、折射高光描边、流动光晕背景、冷色渐变数值
+            - **新增下次执行倒计时**：自动化页实时显示距下一个整点的剩余时间
 
             ### 功能
             - 实时网速（每秒采样收发字节差）
@@ -89,7 +94,6 @@ jobs:
             - WebView 管理页自动登录 admin/admin
             - 恢复出厂 / 重启 / 清流量三种操作，均带二次确认
             - 整点定时自动化 + 本地执行日志
-            - 默认演练模式（只记日志不发包）
 
             ### 实测设备
             Marvell/mifi 固件（LBF1A），HTTP Digest 认证，恢复出厂对应 `json_device_restore_factory`。
@@ -98,7 +102,7 @@ jobs:
             仅含 arm64-v8a（针对小米 Android 16 64 位设备），APK 约 18MB。安装包已正确签名，可正常解析安装。
 
             ### ⚠️ 风险提示
-            真·恢复出厂会清空 SSID、WiFi 密码和管理账号并重启，手机会立刻断网。请先用演练模式验证日志，确认后再关闭演练。
+            恢复出厂会清空 SSID、WiFi 密码和管理账号并重启，手机会立刻断网。演练模式已移除，请谨慎操作。
 
             完整说明见仓库 README。
           files: build/app/outputs/flutter-apk/app-release.apk

@@ -1,16 +1,16 @@
 # WiFi 自动重置
 
-面向小米手机（Android 16、64 位）定制的随身 WiFi 自动化控制 App。基于 Flutter + Kotlin 原生层，通过设备固件自身的 HTTP Digest 接口完成自动化，WebView 仅用于可视化查看管理页。
+面向小米手机（Android 16、64 位）定制的随身 WiFi 自动化控制 App。基于 Flutter + Kotlin 原生层，通过设备固件自身的 HTTP Digest 接口完成自动化，WebView 仅用于可视化查看管理页。UI 采用液体玻璃（Liquid Glass）设计：毛玻璃卡片、折射高光描边、流动光晕背景。
 
 ## 功能
 
 - **实时网速**：每秒采样系统总收发字节差，显示下载 / 上传速率。
 - **前台应用**：通过 `UsageStatsManager` 读取当前前台应用包名与名称，每 3 秒刷新。
 - **WebView 管理页**：自动加载 `http://192.168.1.1` 并以 `admin / admin` 自动登录。
-- **设备操作**：恢复出厂设置、重启设备、重置流量统计，均带二次确认。
-- **定时自动化**：`WorkManager` 每小时第 0 分第 5 秒执行恢复出厂，执行后自动排下一次。
+- **设备操作**：恢复出厂设置、重启设备、重置流量统计，均带二次确认，点击即真实执行。
+- **定时自动化**：`WorkManager` 每小时第 0 分第 5 秒执行恢复出厂，执行后自动排下一次；界面显示下次执行倒计时。
 - **执行日志**：所有手动与定时操作写入本地 `execution_log.jsonl`，在「日志」页查看，最多保留 500 条。
-- **演练模式**：默认开启，只记录日志不发送真实请求，确认无误后再关闭。
+- **液体玻璃 UI**：v1.0.1 起移除演练模式，所有操作真实执行；玻璃卡片 + 冷色渐变 + 流动光晕。
 
 ## 实测设备信息
 
@@ -48,8 +48,8 @@ flutter build apk --release
 
 ## 风险提示
 
-1. 真机模式下「恢复出厂设置」会清空随身 WiFi 的账号、SSID、WiFi 密码等全部配置并重启，手机会立即断网。请仅在自己拥有或明确授权的设备上使用。
-2. 首次使用请先保持演练模式，确认日志内容符合预期后再关闭演练。
+1. 「恢复出厂设置」会清空随身 WiFi 的账号、SSID、WiFi 密码等全部配置并重启，手机会立即断网。请仅在自己拥有或明确授权的设备上使用。
+2. 演示模式已移除，点击操作按钮并二次确认后即真实执行，请谨慎操作。
 3. 定时任务在设备断网后会执行失败并写入日志，需要恢复连接后手动重试。
 
 ## 项目结构
@@ -60,6 +60,7 @@ lib/
   models/models.dart           日志 / 操作结果 / 定时状态模型
   services/native_bridge.dart  MethodChannel / EventChannel 封装
   utils/format.dart            速率格式化与 SSID 解码
+  widgets/glass.dart           液体玻璃组件库（光晕/玻璃卡片/高光描边/渐变文字）
   screens/                     仪表盘、自动化、日志、WebView 四页
 android/app/src/main/kotlin/com/kaixin233/wifiautoreset/
   MifiClient.kt                Digest 认证与 CGI 请求

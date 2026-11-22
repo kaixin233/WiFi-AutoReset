@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wifi_auto_reset/models/models.dart';
 import 'package:wifi_auto_reset/services/native_bridge.dart';
 import 'package:wifi_auto_reset/utils/format.dart';
+import 'package:wifi_auto_reset/widgets/glass.dart';
 
 void main() {
   group('formatSpeed', () {
@@ -39,10 +40,10 @@ void main() {
 
     test('asMapList 转换日志列表', () {
       final list = NativeBridge.asMapList([
-        {'result': '演练', 'action': '恢复出厂设置'},
+        {'result': '已发送', 'action': '恢复出厂设置'},
       ]);
       expect(list.length, 1);
-      expect(LogEntry.fromMap(list.first).isDryRun, isTrue);
+      expect(LogEntry.fromMap(list.first).isSuccess, isTrue);
     });
   });
 
@@ -56,23 +57,56 @@ void main() {
         'detail': 'timeout',
       });
       expect(entry.isFailure, isTrue);
+      expect(entry.isSuccess, isFalse);
       expect(entry.detail, 'timeout');
     });
 
-    test('ActionResult 演练标记', () {
-      final result = ActionResult.fromMap({
-        'ok': true,
-        'dryRun': true,
-        'detail': '演练模式：未发送请求',
+    test('LogEntry 成功标记', () {
+      final entry = LogEntry.fromMap({
+        'time': '2026-11-22 17:00:00',
+        'action': '恢复出厂设置',
+        'mode': '定时',
+        'result': '已发送',
+        'detail': 'ok',
       });
-      expect(result.ok, isTrue);
-      expect(result.dryRun, isTrue);
+      expect(entry.isSuccess, isTrue);
+      expect(entry.isFailure, isFalse);
     });
 
-    test('ScheduleState 解析', () {
-      final state = ScheduleState.fromMap({'enabled': true, 'dryRun': false});
+    test('ActionResult 不再包含演练字段', () {
+      final result = ActionResult.fromMap({
+        'ok': true,
+        'detail': 'success',
+      });
+      expect(result.ok, isTrue);
+      expect(result.detail, 'success');
+    });
+
+    test('ScheduleState 仅解析 enabled', () {
+      final state = ScheduleState.fromMap({'enabled': true});
       expect(state.enabled, isTrue);
-      expect(state.dryRun, isFalse);
+      final off = ScheduleState.fromMap({'enabled': false});
+      expect(off.enabled, isFalse);
+    });
+  });
+
+  group('玻璃主题令牌', () {
+    test('关键令牌非透明且互不相同', () {
+      expect(GlassTokens.accentCyan.alpha, 255);
+      expect(GlassTokens.accentBlue.alpha, 255);
+      expect(GlassTokens.accentPurple.alpha, 255);
+      expect(GlassTokens.accentCyan, isNot(GlassTokens.accentBlue));
+      expect(GlassTokens.textPrimary.alpha, 255);
+      expect(GlassTokens.radius, greaterThan(0));
+    });
+
+    test('渐变文字使用冷色令牌', () {
+      const widget = GradientText(
+        '1.2 MB/s',
+        style: TextStyle(fontSize: 24),
+      );
+      expect(widget.text, '1.2 MB/s');
+      expect(widget.colors.length, 2);
     });
   });
 }

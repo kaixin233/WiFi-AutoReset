@@ -54,28 +54,26 @@ class NativeBridge {
     return value ?? false;
   }
 
-  static Future<ActionResult> factoryReset({required bool dryRun}) async {
-    final map = await _channel.invokeMethod('factoryReset', {'dryRun': dryRun});
+  static Future<ActionResult> factoryReset() async {
+    final map = await _channel.invokeMethod('factoryReset');
     return ActionResult.fromMap(asMap(map));
   }
 
-  static Future<ActionResult> reboot({required bool dryRun}) async {
-    final map = await _channel.invokeMethod('reboot', {'dryRun': dryRun});
+  static Future<ActionResult> reboot() async {
+    final map = await _channel.invokeMethod('reboot');
     return ActionResult.fromMap(asMap(map));
   }
 
-  static Future<ActionResult> resetTraffic({required bool dryRun}) async {
-    final map = await _channel.invokeMethod('resetTraffic', {'dryRun': dryRun});
+  static Future<ActionResult> resetTraffic() async {
+    final map = await _channel.invokeMethod('resetTraffic');
     return ActionResult.fromMap(asMap(map));
   }
 
   static Future<ScheduleState> configureSchedule({
     required bool enabled,
-    required bool dryRun,
   }) async {
     final map = await _channel.invokeMethod('configureSchedule', {
       'enabled': enabled,
-      'dryRun': dryRun,
     });
     return ScheduleState.fromMap(asMap(map));
   }
