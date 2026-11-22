@@ -23,8 +23,8 @@ android {
             // 显式开启 V1+V2 签名：部分国产 ROM（如 MIUI）对仅 V2 签名或签名块异常的包
             // 会报 "解析软件包时出现问题 (33) / packageinfo is null"。
             signingConfig = signingConfigs.getByName("debug")
-            isV1SigningEnabled = true
-            isV2SigningEnabled = true
+            v1SigningEnabled = true
+            v2SigningEnabled = true
         }
     }
 
