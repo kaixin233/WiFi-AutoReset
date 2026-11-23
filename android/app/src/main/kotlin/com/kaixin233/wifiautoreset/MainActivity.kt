@@ -18,6 +18,8 @@ class MainActivity : Activity() {
 
     private var currentTab = -1
     private val pages = mutableMapOf<Int, PageController>()
+    private var headerBasePaddingTop: Int? = null
+    private var navBasePaddingBottom: Int? = null
 
     private data class Tab(val root: Int, val icon: Int, val label: Int, val title: Int)
 
@@ -30,6 +32,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLog.init(this)
         setContentView(R.layout.activity_main)
         setupEdgeToEdge()
 
@@ -69,8 +72,12 @@ class MainActivity : Activity() {
                 val bars = insets.getInsets(WindowInsets.Type.systemBars())
                 val header = findViewById<View>(R.id.toolbar_title)
                 val nav = findViewById<View>(R.id.bottom_nav)
-                header.setPadding(header.paddingStart, bars.top, header.paddingEnd, header.paddingBottom)
-                nav.setPadding(nav.paddingStart, nav.paddingTop, nav.paddingEnd, bars.bottom)
+                // 用初始 padding 作为基线，避免 insets 多次分发时累加；
+                // toolbar 高度为 wrap_content+minHeight，top padding 会撑高而不是压缩文字。
+                val headerTop = headerBasePaddingTop ?: header.paddingTop.also { headerBasePaddingTop = it }
+                header.setPadding(header.paddingStart, headerTop + bars.top, header.paddingEnd, header.paddingBottom)
+                val navBottom = navBasePaddingBottom ?: nav.paddingBottom.also { navBasePaddingBottom = it }
+                nav.setPadding(nav.paddingStart, nav.paddingTop, nav.paddingEnd, navBottom + bars.bottom)
                 v.onApplyWindowInsets(insets)
             }
         } else {

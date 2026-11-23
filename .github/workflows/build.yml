@@ -55,18 +55,23 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.1.0
-          name: WiFi 自动重置 v2.1.0（零依赖纯原生版）
+          tag_name: v2.1.1
+          name: WiFi 自动重置 v2.1.1（零依赖纯原生版）
           body: |
-            ## WiFi 自动重置 v2.1.0
+            ## WiFi 自动重置 v2.1.1
 
             面向小米手机（Android 16、64 位）的随身 WiFi 自动化控制 App。
 
-            ### 本次更新（v2.1.0）—— 架构精简，体积大幅下降
-            - **零第三方依赖**：彻底移除 AppCompat / Material / Fragment / WorkManager，仅用系统原生控件（Button / Switch / RadioButton / WebView）与系统 AlarmManager
-            - **手写标题栏与底栏**：普通原生样式，保留圆角卡片与明暗主题，边角显示正常
-            - **定时任务改用 AlarmManager**：setExactAndAllowWhileIdle + 开机自恢复，倒计时与排程严格对齐
-            - 功能与 v2.0.2 完全一致，无需重新授权无障碍服务
+            ### 本次更新（v2.1.1）—— 修复设备功能与顶部遮挡
+            - **修复设备状态 / 信息 / 操作失效**：更正 Digest 签名与请求路径为固件真实端点 `/xml_action.cgi`（此前签名的 uri 写成不存在的 `/cgi/xml_action.cgi`），并加入失败重试与真实错误诊断
+            - **错误可见**：设备状态卡新增读取状态标签，API 失败直接显示；操作失败 Toast 展示真实原因，不再静默失败
+            - **修复顶部文字被遮挡**：标题栏改为自适应高度，状态栏 padding 只撑高不压缩文字，并避免 insets 重复累加
+            - 功能与 v2.1.0 一致，无需重新授权无障碍服务
+
+            ### v2.1.0 回顾 —— 架构精简，体积大幅下降
+            - **零第三方依赖**：彻底移除 AppCompat / Material / Fragment / WorkManager，仅用系统原生控件与系统 AlarmManager
+            - **手写标题栏与底栏**：普通原生样式，保留圆角卡片与明暗主题
+            - **定时任务改用 AlarmManager**：setExactAndAllowWhileIdle + 开机自恢复
 
             ### 历史修复回顾（v2.0.1）
             - **修复边角显示**：适配 Android 16 强制全屏（edge-to-edge），顶栏避开状态栏、底栏避开手势条与屏幕圆角，不再被遮挡或重叠
@@ -76,7 +81,7 @@ jobs:
             - **修复细节缺陷**：自定义周期切回预设后标签残留、日志并发写入风险、无障碍服务误判前台应用、WebView 销毁方式
 
             ### ⚠️ 关于覆盖安装
-            v1.0.3 起使用固定签名密钥，v1.0.3 ~ v2.0.2 可直接覆盖到 v2.1.0，设置与日志会保留。
+            v1.0.3 起使用固定签名密钥，v1.0.3 ~ v2.1.0 可直接覆盖到 v2.1.1，设置与日志会保留。
             若仍在使用 v1.0.1 / v1.0.2，需先卸载一次（早期 CI 自动生成的密钥证书不同）。
 
             ### 功能

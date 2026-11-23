@@ -103,7 +103,10 @@ class DashboardPage(
 
     private fun refreshStatus() {
         Utils.async(MifiClient::statusInfo) { raw, error ->
-            if (error != null) return@async
+            if (error != null) {
+                view.find<TextView>(R.id.text_api_status).text = "状态读取失败"
+                return@async
+            }
             val s = DeviceStatus.from(raw)
             val charging = when {
                 s.fullyCharged -> "已充满"
@@ -117,13 +120,20 @@ class DashboardPage(
             view.find<TextView>(R.id.text_carrier).text = "运营商：$carrier"
             view.find<TextView>(R.id.text_clients_uptime).text =
                 "在线 ${s.wifiClients} 台 · 已运行 ${s.uptimeLabel}"
+            view.find<TextView>(R.id.text_api_status).text = "状态已更新"
         }
     }
 
     private fun refreshDevice() {
         Utils.async(MifiClient::deviceInfo) { raw, error ->
-            if (error != null) return@async
-            val o = Utils.jsonObject(raw) ?: return@async
+            if (error != null) {
+                view.find<TextView>(R.id.text_api_status).text = "信息读取失败"
+                return@async
+            }
+            val o = Utils.jsonObject(raw) ?: run {
+                view.find<TextView>(R.id.text_api_status).text = "信息解析失败"
+                return@async
+            }
             carrier = Utils.localizeCarrier(o.optString("network_name"))
             val ssid = Utils.decodeUtf16Hex(o.optString("ssid"))
             view.find<TextView>(R.id.text_device_info).text = buildString {
@@ -165,13 +175,18 @@ class DashboardPage(
             .setMessage(message)
             .setNegativeButton("取消", null)
             .setPositiveButton("确认执行") { _, _ ->
+                Toast.makeText(activity, "正在执行…", Toast.LENGTH_SHORT).show()
                 Utils.asyncUi(
                     {
                         val body = action()
-                        AppLog.append(activity, LogEntry(LogEntry.now(), title, "手动", "已发送", body.take(300)))
+                        AppLog.append(
+                            activity,
+                            LogEntry(LogEntry.now(), title, "手动", "已发送", body.take(300)),
+                        )
                     },
                     { error ->
-                        Toast.makeText(activity, if (error == null) "已执行" else "失败：${error.message}", Toast.LENGTH_SHORT).show()
+                        val text = if (error == null) "已执行" else "失败：${error.message}"
+                        Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
                         refreshAll()
                     },
                 )

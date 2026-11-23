@@ -9,6 +9,7 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AlarmScheduler.ACTION_RESET) return
         val app = context.applicationContext
+        AppLog.init(app)
         val pending = goAsync()
         Utils.asyncUi(
             {

@@ -49,6 +49,20 @@ object AppLog {
     private const val PREFS = "wifi_auto_reset"
     private const val KEY_ENABLED = "log_enabled"
 
+    /** 应用级上下文，用于后台线程/Receiver 无 Activity 时写日志。 */
+    @Volatile
+    var appContext: Context? = null
+        private set
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /** 无 Context 场景（如原生客户端内部）写日志；未初始化时静默跳过。 */
+    fun appendGlobal(entry: LogEntry) {
+        appContext?.let { append(it, entry) }
+    }
+
     private fun file(context: Context) = File(context.filesDir, FILE)
 
     /** 日志总开关，默认开启。关闭后所有 append 都直接跳过。 */
