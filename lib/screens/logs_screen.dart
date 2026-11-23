@@ -14,6 +14,7 @@ class LogsScreen extends StatefulWidget {
 class _LogsScreenState extends State<LogsScreen> {
   List<LogEntry> _logs = const [];
   bool _loading = true;
+  bool _enabled = true;
 
   @override
   void initState() {
@@ -22,12 +23,27 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _load() async {
-    final logs = await NativeBridge.getLogs();
+    final results = await Future.wait([
+      NativeBridge.getLogs(),
+      NativeBridge.getLogsEnabled(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _logs = logs;
+      _logs = results[0] as List<LogEntry>;
+      _enabled = results[1] as bool;
       _loading = false;
     });
+  }
+
+  Future<void> _toggleEnabled() async {
+    final enabled = await NativeBridge.setLogsEnabled(!_enabled);
+    if (!mounted) return;
+    setState(() => _enabled = enabled);
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(enabled ? '已开启执行日志' : '已关闭执行日志')),
+    );
   }
 
   Future<void> _clear() async {
@@ -67,6 +83,13 @@ class _LogsScreenState extends State<LogsScreen> {
         title: const Text('执行日志'),
         actions: [
           GlassIconButton(
+            icon: _enabled ? Icons.toggle_on : Icons.toggle_off,
+            tooltip: _enabled ? '关闭日志' : '开启日志',
+            color: _enabled ? palette.accentBlue : palette.textMuted,
+            onTap: _toggleEnabled,
+          ),
+          const SizedBox(width: 8),
+          GlassIconButton(
             icon: Icons.delete_outline,
             tooltip: '清空',
             onTap: _clear,
@@ -80,8 +103,10 @@ class _LogsScreenState extends State<LogsScreen> {
               onRefresh: _load,
               child: _logs.isEmpty
                   ? ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                       children: [
-                        const SizedBox(height: 140),
+                        if (!_enabled) _buildDisabledHint(),
+                        const SizedBox(height: 120),
                         Icon(
                           Icons.history,
                           size: 52,
@@ -98,11 +123,35 @@ class _LogsScreenState extends State<LogsScreen> {
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-                      itemCount: _logs.length,
-                      itemBuilder: (context, index) =>
-                          _buildLogCard(_logs[index]),
+                      itemCount: _logs.length + (_enabled ? 0 : 1),
+                      itemBuilder: (context, index) {
+                        if (!_enabled && index == 0) return _buildDisabledHint();
+                        return _buildLogCard(_logs[index - (_enabled ? 0 : 1)]);
+                      },
                     ),
             ),
+    );
+  }
+
+  Widget _buildDisabledHint() {
+    final palette = context.glass;
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      radius: 16,
+      blur: 10,
+      child: Row(
+        children: [
+          Icon(Icons.toggle_off, size: 18, color: palette.textMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '日志已关闭，新的操作不会写入记录；已有记录仍可查看。',
+              style: TextStyle(fontSize: 12, color: palette.textMuted),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

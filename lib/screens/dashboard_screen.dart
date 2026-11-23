@@ -19,7 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic> _device = const <String, dynamic>{};
   DeviceStatus _status = const DeviceStatus();
   bool _gatewayOk = false;
-  bool _hasUsageAccess = false;
+  bool _hasAccessibilityAccess = false;
   Timer? _timer;
   Timer? _statusTimer;
 
@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _refresh();
     _timer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (_hasUsageAccess) await _refreshForeground();
+      if (_hasAccessibilityAccess) await _refreshForeground();
     });
     _statusTimer = Timer.periodic(
       const Duration(seconds: 10),
@@ -44,9 +44,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refresh() async {
-    final access = await NativeBridge.hasUsageAccess();
+    final access = await NativeBridge.hasAccessibilityAccess();
     if (!mounted) return;
-    setState(() => _hasUsageAccess = access);
+    setState(() => _hasAccessibilityAccess = access);
     if (access) await _refreshForeground();
     await Future.wait([_refreshDevice(), _refreshStatus()]);
     final reachable = await NativeBridge.gatewayReachable();
@@ -264,7 +264,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// 电量 / 信号 / 运营商状态卡，数据来自固件 json_status_info（只读）。
   Widget _buildStatusCard() {
     final palette = context.glass;
-    final carrier = _device['network_name']?.toString() ?? '';
+    final carrier = localizeCarrier(_device['network_name']?.toString() ?? '');
     final chargingText = _status.fullyCharged
         ? '已充满'
         : _status.charging
@@ -495,12 +495,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          if (!_hasUsageAccess)
+          if (!_hasAccessibilityAccess)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '需要「使用情况访问」权限才能读取前台包名。',
+                  '开启「无障碍服务」后即可实时识别前台应用；侧载安装也可在系统设置中手动开启。',
                   style: TextStyle(color: palette.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 12),
@@ -510,10 +510,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    await NativeBridge.requestUsageAccess();
+                    await NativeBridge.requestAccessibilityAccess();
                     await _refresh();
                   },
-                  child: const Text('前往授权'),
+                  child: const Text('前往开启'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '在设置中找到「WiFi 自动重置」并打开开关，返回本页即会自动检测。',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: palette.textMuted.withValues(alpha: 0.8),
+                  ),
                 ),
               ],
             )
@@ -522,7 +530,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
+                  pkg.isEmpty ? '等待窗口事件' : label,
                   style: TextStyle(
                     fontSize: 18,
                     color: palette.textPrimary,
@@ -531,7 +539,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 5),
                 SelectableText(
-                  pkg.isEmpty ? '暂无前台应用' : pkg,
+                  pkg.isEmpty ? '切换一次应用即可获取包名' : pkg,
                   style: TextStyle(fontSize: 12, color: palette.textMuted),
                 ),
                 const SizedBox(height: 5),
@@ -555,7 +563,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ['设备型号', _device['device_name']?.toString() ?? '--'],
       ['固件版本', _device['sw_version']?.toString() ?? '--'],
       ['Wi-Fi 名称', ssid.isEmpty ? '--' : ssid],
-      ['运营商', _device['network_name']?.toString() ?? '--'],
+      ['运营商', localizeCarrier(_device['network_name']?.toString() ?? '')],
       ['IMEI', _device['imei']?.toString() ?? '--'],
       ['局域网 IP', _device['lan_ip']?.toString() ?? '--'],
       ['广域网 IP', _device['wan_ip']?.toString() ?? '--'],

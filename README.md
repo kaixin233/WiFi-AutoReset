@@ -6,13 +6,13 @@
 
 - **实时网速**：每秒采样系统总收发字节差，显示下载 / 上传速率。
 - **设备状态卡**：每 10 秒读取固件只读接口 `json_status_info`，展示电量百分比与充电状态、蜂窝信号等级与 RSSI、运营商、在线设备数、运行时长。
-- **前台应用**：通过 `UsageStatsManager` 读取当前前台应用包名与名称，每 3 秒刷新。
+- **前台应用**：通过无障碍服务监听窗口切换事件实时获取前台包名与名称，每 3 秒刷新；侧载的未知应用也可在系统设置中手动开启，不依赖「使用情况访问」权限。
 - **WebView 管理页**：自动加载 `http://192.168.1.1` 并以 `admin / admin` 自动登录。
 - **设备操作**：恢复出厂设置、重启设备、重置流量统计，均带二次确认，点击即真实执行（演练模式已移除）。
 - **定时自动化**：`WorkManager` 按自定义周期执行恢复出厂（5 ~ 1440 分钟，默认 60 分钟），执行后自动排下一次；界面提供快捷档位与自定义分钟输入，并显示与原生排程严格对齐的倒计时。
-- **执行日志**：所有手动与定时操作写入本地 `execution_log.jsonl`，在「日志」页查看，最多保留 500 条。
+- **执行日志**：所有手动与定时操作写入本地 `execution_log.jsonl`，在「日志」页查看，最多保留 500 条；右上角开关可随时关闭记录，已有记录仍可查看或清空。
 - **浅色 / 深色跟随系统**：明暗两套色板，随系统外观自动切换，玻璃卡片与文字对比度均经过适配。
-- **液态玻璃底栏**：强模糊毛玻璃 Dock、渐变高光描边、弹簧滑动胶囊指示器、选中图标缩放与点按涟漪。
+- **液态玻璃底栏**：半透明 Dock + 底层光斑折射、弹性拉伸胶囊指示器、顶部反光与点按涟漪；选中项使用主题强调色。
 
 ## 实测设备信息
 
@@ -57,7 +57,7 @@ flutter test
 flutter build apk --release --target-platform android-arm64
 ```
 
-**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 `1.0.3+4`，versionCode = 4）。
+**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 `1.0.4+5`，versionCode = 5）。
 
 从 v1.0.3 起，Release 使用仓库内固定的 `android/app/release.p12` 签名（PKCS12，别名 `wifiautoreset`），CI 每次构建都使用同一证书，之后的版本可直接覆盖安装且保留 SharedPreferences 与日志数据。
 
@@ -66,7 +66,7 @@ flutter build apk --release --target-platform android-arm64
 ## 权限
 
 - 网络访问、Wi-Fi 状态：安装即授予。
-- **使用情况访问**（`PACKAGE_USAGE_STATS`）：需用户在系统设置中手动开启，否则无法读取前台包名；App 内有「前往授权」按钮。
+- **无障碍服务**（`BIND_ACCESSIBILITY_SERVICE`）：在系统设置中手动开启「WiFi 自动重置」后，才能实时读取前台包名；只使用窗口事件的 `packageName`，不读取窗口内容、不上传。侧载安装同样可开启。
 - Android 16 上后台任务受系统省电策略限制，定时执行可能延迟数分钟，无法保证毫秒级准点。
 
 ## 风险提示
@@ -83,14 +83,15 @@ lib/
   main.dart                    应用入口、主题配置与液态玻璃底栏
   models/models.dart           日志 / 操作结果 / 定时状态 / 设备状态模型
   services/native_bridge.dart  MethodChannel / EventChannel 封装
-  utils/format.dart            速率格式化与 SSID 解码
+  utils/format.dart            速率格式化、SSID 解码与运营商中文化
   widgets/glass.dart           双色板与液体玻璃组件库（光晕/卡片/高光/Dock）
   screens/                     仪表盘、自动化、日志、WebView 四页
 android/app/src/main/kotlin/com/kaixin233/wifiautoreset/
   MifiClient.kt                Digest 认证与 CGI 请求（含只读 status_info）
   NativeBridge.kt              MethodChannel 分发与后台线程
   SpeedMonitor.kt              网速采样
-  ForegroundAppDetector.kt     前台应用检测
+  ForegroundAppDetector.kt     无障碍权限检测与前台包名缓存
+  ForegroundAccessibilityService.kt  实时窗口事件监听
   AutoResetWorker.kt           自定义周期定时任务
   AppLog.kt                    日志持久化
 test/native_bridge_test.dart   合约测试

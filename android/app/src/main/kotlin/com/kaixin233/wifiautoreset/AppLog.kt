@@ -46,10 +46,23 @@ data class LogEntry(
 object AppLog {
     private const val FILE = "execution_log.jsonl"
     private const val MAX_LINES = 500
+    private const val PREFS = "wifi_auto_reset"
+    private const val KEY_ENABLED = "log_enabled"
 
     private fun file(context: Context) = File(context.filesDir, FILE)
 
+    /** 日志总开关，默认开启。关闭后所有 append 都直接跳过。 */
+    fun isEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ENABLED, true)
+
+    fun setEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
     fun append(context: Context, entry: LogEntry) {
+        if (!isEnabled(context)) return
         val target = file(context)
         target.appendText(entry.toJson().toString() + "\n")
         val lines = target.readLines()

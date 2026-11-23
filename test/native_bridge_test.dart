@@ -47,6 +47,21 @@ void main() {
     });
   });
 
+  group('localizeCarrier', () {
+    test('国内三大运营商映射为中文', () {
+      expect(localizeCarrier('CHN UNICOM'), '中国联通');
+      expect(localizeCarrier('CHINA MOBILE'), '中国移动');
+      expect(localizeCarrier('CHN TELECOM'), '中国电信');
+      expect(localizeCarrier('  chn  unicom  '), '中国联通');
+    });
+
+    test('已是中文或未知运营商不改写', () {
+      expect(localizeCarrier('中国联通'), '中国联通');
+      expect(localizeCarrier('Some ISP'), 'Some ISP');
+      expect(localizeCarrier(''), '--');
+    });
+  });
+
   group('decodeUtf16Hex', () {
     test('解码固件返回的 SSID', () {
       expect(
@@ -182,6 +197,46 @@ void main() {
       );
       expect(custom.colors, hasLength(2));
       expect(custom.colors!.first, GlassTokens.accentCyan);
+    });
+
+    test('浅色 Dock 背景必须半透明才能呈现玻璃折射', () {
+      expect(GlassPalette.light.dockTintTop.alpha, lessThan(255));
+      expect(GlassPalette.light.dockTintBottom.alpha, lessThan(255));
+      expect(GlassPalette.dark.dockTintTop.alpha, lessThan(255));
+    });
+
+    testWidgets('液态玻璃底栏可渲染并切换选中项', (tester) async {
+      var index = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GlassTheme(
+              palette: GlassPalette.light,
+              child: StatefulBuilder(
+                builder: (context, setState) => LiquidGlassNavBar(
+                  currentIndex: index,
+                  icons: const [
+                    Icons.space_dashboard_outlined,
+                    Icons.schedule_outlined,
+                  ],
+                  activeIcons: const [Icons.space_dashboard, Icons.schedule],
+                  labels: const ['仪表盘', '自动化'],
+                  onTap: (i) => setState(() => index = i),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('仪表盘'), findsOneWidget);
+      await tester.tap(find.text('自动化'));
+      await tester.pumpAndSettle();
+      final selected = tester.widget<Semantics>(
+        find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.label == '自动化',
+        ),
+      );
+      expect(selected.selected, isTrue);
     });
 
     test('明暗色板文字与背景对比方向正确', () {

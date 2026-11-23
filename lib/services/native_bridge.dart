@@ -25,13 +25,14 @@ class NativeBridge {
   static Stream<Map<String, dynamic>> get speedStream =>
       _speedChannel.receiveBroadcastStream().map(asMap);
 
-  static Future<bool> hasUsageAccess() async {
-    final value = await _channel.invokeMethod<bool>('hasUsageAccess');
+  static Future<bool> hasAccessibilityAccess() async {
+    final value =
+        await _channel.invokeMethod<bool>('hasAccessibilityAccess');
     return value ?? false;
   }
 
-  static Future<void> requestUsageAccess() =>
-      _channel.invokeMethod<void>('requestUsageAccess');
+  static Future<void> requestAccessibilityAccess() =>
+      _channel.invokeMethod<void>('requestAccessibilityAccess');
 
   static Future<Map<String, dynamic>> foregroundApp() async {
     return asMap(await _channel.invokeMethod('foregroundApp'));
@@ -105,4 +106,16 @@ class NativeBridge {
   }
 
   static Future<void> clearLogs() => _channel.invokeMethod<void>('clearLogs');
+
+  static Future<bool> getLogsEnabled() async {
+    final value = asMap(await _channel.invokeMethod('getLogsEnabled'))['enabled'];
+    return value is bool ? value : true;
+  }
+
+  static Future<bool> setLogsEnabled(bool enabled) async {
+    final value = asMap(
+      await _channel.invokeMethod('setLogsEnabled', {'enabled': enabled}),
+    )['enabled'];
+    return value is bool ? value : enabled;
+  }
 }

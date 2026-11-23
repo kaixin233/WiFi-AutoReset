@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_description">用于实时识别当前前台应用名称，仅在设备本地显示，不上传、不记录。</string>
+</resources>

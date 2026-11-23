@@ -1,51 +1,67 @@
 package com.kaixin233.wifiautoreset
 
-import android.app.AppOpsManager
-import android.app.usage.UsageEvents
-import android.app.usage.UsageStatsManager
+import android.content.ComponentName
 import android.content.Context
-import android.os.Build
-import android.os.Process
+import android.provider.Settings
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-/** 依赖「使用情况访问」权限读取前台应用包名。 */
+/**
+ * 通过无障碍服务监听窗口切换事件来识别前台应用。
+ *
+ * 相比 UsageStatsManager，无障碍服务不依赖「使用情况访问」权限，
+ * 侧载的未知应用也可在系统设置中手动开启，且能实时拿到 packageName。
+ */
 class ForegroundAppDetector(private val context: Context) {
-    private val usage by lazy {
-        context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    companion object {
+        private const val PREFS = "foreground_app"
+        private const val KEY_PACKAGE = "package"
+        private const val KEY_AT = "at"
+
+        @Volatile
+        private var cachedPackage: String? = null
+
+        @Volatile
+        private var cachedAt: String = ""
+
+        /** 由无障碍服务在收到窗口事件时调用。相同包名不重复写入。 */
+        fun observe(context: Context, packageName: String) {
+            if (packageName.isBlank() || packageName == cachedPackage) return
+            cachedPackage = packageName
+            cachedAt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_PACKAGE, packageName)
+                .putString(KEY_AT, cachedAt)
+                .apply()
+        }
     }
 
+    private val component by lazy {
+        ComponentName(context, ForegroundAccessibilityService::class.java).flattenToString()
+    }
+
+    /** 系统「无障碍」设置中是否已启用本应用的服务。 */
     fun hasPermission(): Boolean {
-        val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ops.unsafeCheckOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                Process.myUid(),
-                context.packageName,
-            )
-        } else {
-            ops.checkOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                Process.myUid(),
-                context.packageName,
-            )
-        }
-        return mode == AppOpsManager.MODE_ALLOWED
+        val enabled = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        return enabled.split(':').any { it.equals(component, ignoreCase = true) }
     }
 
     fun currentPackage(): String? {
         if (!hasPermission()) return null
-        val now = System.currentTimeMillis()
-        val events = usage.queryEvents(now - 10_000, now)
-        val event = UsageEvents.Event()
-        var found: String? = null
-        var latest = 0L
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND && event.timeStamp > latest) {
-                latest = event.timeStamp
-                found = event.packageName
-            }
-        }
-        return found
+        val stored = cachedPackage ?: context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_PACKAGE, null)
+        return stored?.takeIf { it.isNotBlank() }
+    }
+
+    fun lastTime(): String {
+        if (cachedAt.isNotBlank()) return cachedAt
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_AT, "") ?: ""
     }
 
     fun labelOf(packageName: String?): String {

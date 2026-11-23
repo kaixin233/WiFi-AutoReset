@@ -38,10 +38,10 @@ class NativeBridge(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "hasUsageAccess" -> result.success(detector.hasPermission())
+            "hasAccessibilityAccess" -> result.success(detector.hasPermission())
 
-            "requestUsageAccess" -> {
-                val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            "requestAccessibilityAccess" -> {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
                 result.success(null)
@@ -53,7 +53,7 @@ class NativeBridge(
                     mapOf(
                         "package" to (pkg ?: ""),
                         "label" to detector.labelOf(pkg),
-                        "time" to LogEntry.now(),
+                        "time" to detector.lastTime().ifBlank { LogEntry.now() },
                     ),
                 )
             }
@@ -118,6 +118,25 @@ class NativeBridge(
             "clearLogs" -> {
                 AppLog.clear(context)
                 result.success(null)
+            }
+
+            "getLogsEnabled" -> result.success(mapOf("enabled" to AppLog.isEnabled(context)))
+            "setLogsEnabled" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: true
+                if (!enabled && AppLog.isEnabled(context)) {
+                    AppLog.append(
+                        context,
+                        LogEntry(LogEntry.now(), "日志设置", "手动", "已关闭", "后续操作不再写入执行日志"),
+                    )
+                }
+                AppLog.setEnabled(context, enabled)
+                if (enabled) {
+                    AppLog.append(
+                        context,
+                        LogEntry(LogEntry.now(), "日志设置", "手动", "已开启", "后续操作将写入执行日志"),
+                    )
+                }
+                result.success(mapOf("enabled" to enabled))
             }
 
             else -> result.notImplemented()

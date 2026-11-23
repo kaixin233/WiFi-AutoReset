@@ -116,9 +116,9 @@ class GlassPalette {
     cardShadow: Color(0x1A1F3A75),
     divider: Color(0x1A16213E),
     surfaceFill: Color(0x66FFFFFF),
-    dockTintTop: Color(0xE8FFFFFF),
-    dockTintBottom: Color(0xB3FFFFFF),
-    dockBorder: Color(0xCCFFFFFF),
+    dockTintTop: Color(0xB3FFFFFF),
+    dockTintBottom: Color(0x80FFFFFF),
+    dockBorder: Color(0xA6FFFFFF),
     pillColor: Color(0x332F6FE4),
     glowColor: Color(0x2E2F6FE4),
     orbOpacity: 0.14,
@@ -450,7 +450,8 @@ class GlassIconButton extends StatelessWidget {
 }
 
 /// 酷安风格液态玻璃底栏：
-/// 强模糊毛玻璃 Dock + 渐变高光描边 + 弹簧滑动胶囊 + 图标缩放 + 点按涟漪。
+/// 半透明 Dock + 背景光斑折射 + 弹性拉伸胶囊 + 顶部反光 + 点按涟漪。
+/// 关键点是让背景色真正透过来：Dock 不能是不透明白底，胶囊也不能是硬色块。
 class LiquidGlassNavBar extends StatefulWidget {
   const LiquidGlassNavBar({
     super.key,
@@ -473,21 +474,56 @@ class LiquidGlassNavBar extends StatefulWidget {
 
 class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
     with TickerProviderStateMixin {
+  late final AnimationController _slide;
+  late final CurvedAnimation _slideCurve;
+  late final AnimationController _squish;
   late final AnimationController _ripple;
+  int _fromIndex = 0;
   int? _rippleIndex;
 
   @override
   void initState() {
     super.initState();
+    _fromIndex = widget.currentIndex;
+    _slide = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 460),
+    )..value = 1;
+    _slideCurve = CurvedAnimation(parent: _slide, curve: Curves.easeOutCubic);
+    _squish = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 460),
+    )..value = 1;
     _ripple = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 520),
     );
+    _slide.addListener(_onTick);
+    _squish.addListener(_onTick);
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant LiquidGlassNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex) {
+      _fromIndex = oldWidget.currentIndex;
+      _slide.forward(from: 0);
+      _squish.forward(from: 0);
+    }
   }
 
   @override
   void dispose() {
+    _slide.removeListener(_onTick);
+    _squish.removeListener(_onTick);
     _ripple.dispose();
+    _squish.dispose();
+    _slideCurve.dispose();
+    _slide.dispose();
     super.dispose();
   }
 
@@ -503,6 +539,9 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
     final count = widget.labels.length;
 
     return SafeArea(
+      top: false,
+      left: false,
+      right: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
         child: DecoratedBox(
@@ -523,35 +562,79 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final itemWidth = constraints.maxWidth / count;
-                  return Container(
-                    height: 62,
+            borderRadius: BorderRadius.circular(30),
+            child: Stack(
+              children: [
+                // 背景光斑位于模糊层下方，被 BackdropFilter 折射成流动底色。
+                Positioned.fill(
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
                       gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [palette.dockTintTop, palette.dockTintBottom],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          palette.accentCyan.withValues(
+                            alpha: palette.isDark ? 0.20 : 0.16,
+                          ),
+                          Colors.transparent,
+                          palette.accentPurple.withValues(
+                            alpha: palette.isDark ? 0.18 : 0.12,
+                          ),
+                        ],
                       ),
-                      border: Border.all(color: palette.dockBorder, width: 1),
                     ),
-                    child: Stack(
-                      children: [
-                        // 弹簧滑动的液态胶囊
-                        AnimatedPositioned(
-                          duration: const Duration(milliseconds: 430),
-                          curve: Curves.easeOutBack,
-                          left: widget.currentIndex * itemWidth + 7,
-                          top: 5,
-                          bottom: 5,
-                          width: itemWidth - 14,
-                          child: _buildPill(palette),
+                  ),
+                ),
+                BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final itemWidth = constraints.maxWidth / count;
+                      final t = _slideCurve.value;
+                      final position = _fromIndex +
+                          (widget.currentIndex - _fromIndex) * t;
+                      final pulse = _squish.value < 1
+                          ? (1 - (_squish.value - 0.5).abs() * 2)
+                              .clamp(0.0, 1.0)
+                              .toDouble()
+                          : 0.0;
+                      return Container(
+                        height: 64,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(30),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              palette.dockTintTop,
+                              palette.dockTintBottom
+                            ],
+                          ),
+                          border: Border.all(
+                            color: palette.dockBorder.withValues(
+                              alpha: palette.isDark ? 0.5 : 0.75,
+                            ),
+                            width: 1,
+                          ),
                         ),
+                        child: Stack(
+                          children: [
+                            // 液态胶囊：滑动时轻微横向拉伸、纵向压缩。
+                            Positioned(
+                              left: position * itemWidth + 6,
+                              top: 5,
+                              bottom: 5,
+                              width: itemWidth - 12,
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.diagonal3Values(
+                                  1 + 0.18 * pulse,
+                                  1 - 0.10 * pulse,
+                                  1,
+                                ),
+                                child: _buildPill(palette),
+                              ),
+                            ),
                         // 顶部高光反射
                         Positioned(
                           left: 18,
@@ -581,7 +664,7 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
                                 left: _rippleIndex! * itemWidth +
                                     itemWidth / 2 -
                                     34,
-                                top: 31 - 34,
+                                top: 32 - 34,
                                 child: Transform.scale(
                                   scale: 0.35 + t * 2.1,
                                   child: Opacity(
@@ -622,6 +705,8 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
                 },
               ),
             ),
+              ],
+            ),
           ),
         ),
       ),
@@ -629,31 +714,70 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
   }
 
   Widget _buildPill(GlassPalette palette) {
+    final highlight = palette.isDark ? Colors.white : palette.accentBlue;
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(26),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            palette.accentCyan.withValues(alpha: 0.42),
-            palette.pillColor,
+            palette.accentCyan.withValues(alpha: palette.isDark ? 0.55 : 0.34),
+            palette.accentBlue.withValues(alpha: palette.isDark ? 0.45 : 0.26),
+            palette.accentPurple.withValues(alpha: palette.isDark ? 0.38 : 0.20),
           ],
+          stops: const [0.0, 0.55, 1.0],
         ),
         border: Border.all(
-          color: palette.accentCyan.withValues(alpha: 0.65),
-          width: 1,
+          color: palette.cardBorder.withValues(
+            alpha: palette.isDark ? 0.5 : 0.75,
+          ),
+          width: 0.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: palette.glowColor,
-            blurRadius: 12,
-            spreadRadius: -2,
-          ),
-          BoxShadow(
-            color: palette.cardShadow,
-            blurRadius: 8,
+            color: palette.glowColor.withValues(alpha: palette.isDark ? 0.8 : 0.6),
+            blurRadius: 20,
+            spreadRadius: -4,
             offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 12,
+            right: 12,
+            top: 1,
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    highlight.withValues(alpha: 0.7),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 1,
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    palette.accentCyan.withValues(alpha: 0.28),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -662,6 +786,8 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
 
   Widget _buildItem(int index, GlassPalette palette) {
     final selected = index == widget.currentIndex;
+    final accent = palette.isDark ? palette.accentCyan : palette.accentBlue;
+    final color = selected ? accent : palette.textMuted;
     return Semantics(
       selected: selected,
       button: true,
@@ -674,22 +800,22 @@ class _LiquidGlassNavBarState extends State<LiquidGlassNavBar>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedScale(
-              scale: selected ? 1.16 : 1.0,
+              scale: selected ? 1.12 : 1.0,
               duration: const Duration(milliseconds: 380),
               curve: Curves.easeOutBack,
               child: Icon(
                 selected ? widget.activeIcons[index] : widget.icons[index],
                 size: 21,
-                color: selected ? palette.textPrimary : palette.textMuted,
+                color: color,
               ),
             ),
             const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 220),
               style: TextStyle(
-                fontSize: selected ? 10.5 : 10,
+                fontSize: selected ? 11 : 10,
                 height: 1,
-                color: selected ? palette.textPrimary : palette.textMuted,
+                color: color,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
               child: Text(widget.labels[index]),
