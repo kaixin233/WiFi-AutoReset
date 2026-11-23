@@ -1,7 +1,7 @@
 package com.kaixin233.wifiautoreset
 
+import android.app.Activity
 import android.app.AlertDialog
-import android.os.Bundle
 import android.view.View
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -11,16 +11,18 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.Toast
-import androidx.fragment.app.Fragment
 
-class WebFragment : Fragment(R.layout.fragment_web) {
+/** WebView 管理页控制器。 */
+class WebPage(
+    private val activity: Activity,
+    override val view: View,
+) : PageController {
 
     private var webView: WebView? = null
     private var progress: ProgressBar? = null
+    private var loginPosted = false
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
+    init {
         progress = view.find(R.id.progress)
         val web = view.find<WebView>(R.id.webview)
         webView = web
@@ -33,21 +35,16 @@ class WebFragment : Fragment(R.layout.fragment_web) {
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 progress?.visibility = View.GONE
-                view?.postDelayed({ login() }, 600)
+                if (!loginPosted) {
+                    loginPosted = true
+                    view?.postDelayed({ login() }, 600)
+                }
             }
 
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: WebResourceError?,
-            ) {
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 progress?.visibility = View.GONE
                 if (request?.isForMainFrame == true) {
-                    Toast.makeText(
-                        requireContext(),
-                        "管理页加载失败，请确认已连接随身 WiFi",
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    Toast.makeText(activity, "管理页加载失败，请确认已连接随身 WiFi", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -55,8 +52,7 @@ class WebFragment : Fragment(R.layout.fragment_web) {
 
         view.find<Button>(R.id.btn_religin).setOnClickListener { login() }
         view.find<Button>(R.id.btn_web_factory).setOnClickListener {
-            val ctx = requireContext()
-            AlertDialog.Builder(ctx)
+            AlertDialog.Builder(activity)
                 .setTitle("恢复出厂设置")
                 .setMessage("此操作会清空随身 WiFi 全部配置并重启，手机将断网。确认继续？")
                 .setNegativeButton("取消", null)
@@ -64,17 +60,10 @@ class WebFragment : Fragment(R.layout.fragment_web) {
                     Utils.asyncUi(
                         {
                             val body = MifiClient.factoryReset()
-                            AppLog.append(
-                                ctx,
-                                LogEntry(LogEntry.now(), "恢复出厂设置", "手动", "已发送", body.take(300)),
-                            )
+                            AppLog.append(activity, LogEntry(LogEntry.now(), "恢复出厂设置", "手动", "已发送", body.take(300)))
                         },
                         { error ->
-                            Toast.makeText(
-                                ctx,
-                                if (error == null) "已执行" else "失败：${error.message}",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            Toast.makeText(activity, if (error == null) "已执行" else "失败：${error.message}", Toast.LENGTH_SHORT).show()
                         },
                     )
                 }
@@ -101,7 +90,7 @@ class WebFragment : Fragment(R.layout.fragment_web) {
         )
     }
 
-    override fun onDestroyView() {
+    override fun onDestroy() {
         webView?.let { web ->
             (web.parent as? android.view.ViewGroup)?.removeView(web)
             web.stopLoading()
@@ -109,6 +98,5 @@ class WebFragment : Fragment(R.layout.fragment_web) {
         }
         webView = null
         progress = null
-        super.onDestroyView()
     }
 }

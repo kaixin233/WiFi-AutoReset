@@ -2,7 +2,7 @@
 
 面向小米手机（Android 16、64 位）定制的随身 WiFi 自动化控制 App。
 
-**v2.0.0 起为纯原生 Kotlin Android 应用**：已彻底移除 Flutter 引擎与 Dart 代码，体积显著减小；底部导航改用标准 Material `BottomNavigationView`，界面为普通 Material 风格，明暗外观跟随系统。v2.0.1 适配 Android 16 强制全屏（edge-to-edge），顶栏避开状态栏、底栏避开手势条与屏幕圆角，并统一卡片/按钮/标签圆角。
+**v2.1.0 起为完全零依赖的纯原生 Android 应用**：无 Flutter、无 AppCompat / Material / Fragment / WorkManager，全部使用系统原生控件（`Button`、`Switch`、`RadioButton`、`WebView`）与 `AlarmManager`；标题栏与底栏手写实现，明暗外观跟随系统，适配 Android 16 强制全屏（edge-to-edge）。APK 体积相比 Material 版再次大幅下降。
 
 ## 功能
 
@@ -12,7 +12,7 @@
 - **前台应用**：通过无障碍服务监听窗口事件实时获取前台包名与名称，每 3 秒刷新；侧载的未知应用也可在系统设置中手动开启。
 - **WebView 管理页**：自动加载 `http://192.168.1.1` 并以 `admin / admin` 自动登录。
 - **设备操作**：恢复出厂设置、重启设备、重置流量统计，均带二次确认，点击即真实执行（无演练模式）。
-- **定时自动化**：`WorkManager` 按自定义周期执行恢复出厂（5 ~ 1440 分钟，默认 60 分钟），提供快捷档位与自定义输入，倒计时与原生排程严格对齐。
+- **定时自动化**：系统 `AlarmManager`（`setExactAndAllowWhileIdle`）按自定义周期执行恢复出厂（5 ~ 1440 分钟，默认 60 分钟），提供快捷档位与自定义输入，倒计时与排程严格对齐；开机后由 `BootReceiver` 自动恢复任务。
 - **执行日志**：所有手动与定时操作写入本地 `execution_log.jsonl`，可随时关闭记录、查看和清空。
 
 ## 实测设备信息
@@ -43,9 +43,9 @@ gradle -p android :app:assembleRelease
 
 产物：`android/app/build/outputs/apk/release/app-release.apk`
 
-**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 **2.0.2+8**，versionCode = 8）。
+**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 **2.1.0+9**，versionCode = 9）。
 
-从 v1.0.3 起 Release 使用仓库内固定的 `android/app/release.p12`。v1.0.3 / v1.0.4 可直接覆盖升级到 v2.0.2，设置与日志数据保留。release 构建已开启 R8 代码压缩与资源压缩，并只保留中文资源。v1.0.1 / v1.0.2 使用早期 CI 自动生成的密钥，证书不同，需先卸载一次。
+从 v1.0.3 起 Release 使用仓库内固定的 `android/app/release.p12`。v1.0.3 及以后版本可直接覆盖升级到 v2.1.0，设置与日志数据保留。release 构建开启 R8 代码压缩与资源压缩，并只保留中文资源。v1.0.1 / v1.0.2 使用早期 CI 自动生成的密钥，证书不同，需先卸载一次。
 
 ## 权限
 
@@ -64,18 +64,21 @@ gradle -p android :app:assembleRelease
 
 ```
 android/app/src/main/kotlin/com/kaixin233/wifiautoreset/
-  MainActivity.kt                    标准底栏、全屏边角适配与页面切换
-  DashboardFragment.kt               仪表盘
-  AutomationFragment.kt              定时自动化
-  LogsFragment.kt                    执行日志
-  WebFragment.kt                     WebView 管理页
+  MainActivity.kt                    原生 Activity、手写标题栏/底栏与页面切换
+  PageController.kt                  页面控制器契约
+  DashboardPage.kt                   仪表盘
+  AutomationPage.kt                  定时自动化
+  LogsPage.kt                        执行日志
+  WebPage.kt                         WebView 管理页
+  AlarmScheduler.kt                  AlarmManager 周期调度
+  AlarmReceiver.kt                   定时执行恢复出厂
+  BootReceiver.kt                    开机恢复定时任务
   Utils.kt                           线程/JSON/格式化工具
   MifiClient.kt                      Digest 认证与 CGI 请求
   SpeedMonitor.kt                    网速采样
   ForegroundAppDetector.kt           无障碍权限与前台包名缓存
   ForegroundAccessibilityService.kt  实时窗口事件监听
-  AutoResetWorker.kt                 WorkManager 定时任务
   AppLog.kt                          日志持久化
-android/app/src/main/res/layout/     四个页面的普通 Material 布局
+android/app/src/main/res/layout/     四个页面的原生布局 + activity_main
 android/app/release.p12              固定发布签名密钥
 ```

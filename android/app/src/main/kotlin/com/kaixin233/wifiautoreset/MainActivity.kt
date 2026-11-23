@@ -1,78 +1,140 @@
 package com.kaixin233.wifiautoreset
 
+import android.app.Activity
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.PorterDuff
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
-import androidx.fragment.app.Fragment
-import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.bottomnavigation.BottomNavigationView
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.TextView
 
-class MainActivity : AppCompatActivity() {
+/** 纯原生主界面：手写标题栏 + 内容容器 + 手写底栏，页面用 View 控制器切换。 */
+class MainActivity : Activity() {
 
-    private var currentTab: Int = -1
+    private var currentTab = -1
+    private val pages = mutableMapOf<Int, PageController>()
+
+    private data class Tab(val root: Int, val icon: Int, val label: Int, val title: Int)
+
+    private val tabs = listOf(
+        Tab(R.id.tab_dashboard, R.id.iv_dashboard, R.id.tv_dashboard, R.string.title_dashboard),
+        Tab(R.id.tab_automation, R.id.iv_automation, R.id.tv_automation, R.string.title_automation),
+        Tab(R.id.tab_logs, R.id.iv_logs, R.id.tv_logs, R.string.title_logs),
+        Tab(R.id.tab_web, R.id.iv_web, R.id.tv_web, R.string.title_web),
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        setupEdgeToEdge()
 
-        // targetSdk 36 强制 edge-to-edge：必须显式处理状态栏/手势栏 inset，
-        // 否则顶栏会被状态栏压住、底栏与手势条及屏幕圆角重叠。
-        // 用 core 1.5+ 的 setDecorFitsSystemWindows（enableEdgeToEdge 需 core 1.17+）。
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        tabs.forEach { tab ->
+            findViewById<View>(tab.root).setOnClickListener { switchTo(tab) }
+        }
+
+        val savedTab = savedInstanceState?.getInt(KEY_TAB, R.id.tab_dashboard) ?: R.id.tab_dashboard
+        val initial = tabs.firstOrNull { it.root == savedTab } ?: tabs[0]
+        switchTo(initial, force = true)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_TAB, currentTab)
+    }
+
+    private fun setupEdgeToEdge() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
+
         val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = !night
-            isAppearanceLightNavigationBars = !night
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // WindowInsetsController：API 30+ 原生常量，浅色图标仅在浅色主题使用。
+            val lightStatus = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+            val lightNav = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            val appearance = if (night) 0 else lightStatus or lightNav
+            window.insetsController?.setSystemBarsAppearance(appearance, lightStatus or lightNav)
 
-        setContentView(R.layout.activity_main)
-
-        val root = findViewById<View>(R.id.root)
-        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
-        val nav = findViewById<BottomNavigationView>(R.id.bottom_nav)
-
-        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            toolbar.updatePadding(top = bars.top)
-            nav.updatePadding(bottom = bars.bottom)
-            insets
-        }
-
-        nav.setOnItemSelectedListener { item ->
-            if (item.itemId != currentTab) switchTo(item.itemId)
-            true
-        }
-        if (savedInstanceState == null) {
-            nav.selectedItemId = R.id.nav_dashboard
+            val decor = window.decorView
+            decor.setOnApplyWindowInsetsListener { v, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                val header = findViewById<View>(R.id.toolbar_title)
+                val nav = findViewById<View>(R.id.bottom_nav)
+                header.setPadding(header.paddingStart, bars.top, header.paddingEnd, header.paddingBottom)
+                nav.setPadding(nav.paddingStart, nav.paddingTop, nav.paddingEnd, bars.bottom)
+                v.onApplyWindowInsets(insets)
+            }
         } else {
-            currentTab = nav.selectedItemId
-            toolbar.title = nav.menu.findItem(currentTab).title
+            @Suppress("DEPRECATION")
+            var flags = window.decorView.systemUiVisibility or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            flags = if (night) {
+                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+            } else {
+                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            }
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = flags
         }
     }
 
-    private fun switchTo(itemId: Int) {
-        currentTab = itemId
-        val (fragment, titleRes) = when (itemId) {
-            R.id.nav_automation -> AutomationFragment() to R.string.title_automation
-            R.id.nav_logs -> LogsFragment() to R.string.title_logs
-            R.id.nav_web -> WebFragment() to R.string.title_web
-            else -> DashboardFragment() to R.string.title_dashboard
+    private fun switchTo(tab: Tab, force: Boolean = false) {
+        if (tab.root == currentTab && !force) return
+        pages[currentTab]?.onHide()
+        val holder = findViewById<View>(R.id.container) as android.view.ViewGroup
+        holder.removeAllViews()
+
+        currentTab = tab.root
+        findViewById<TextView>(R.id.toolbar_title).setText(tab.title)
+        updateTabStyles(tab)
+
+        val page = pages.getOrPut(tab.root) { createPage(tab) }
+        holder.addView(page.view)
+        page.onShow()
+    }
+
+    private fun createPage(tab: Tab): PageController {
+        val layout = when (tab.root) {
+            R.id.tab_automation -> R.layout.page_automation
+            R.id.tab_logs -> R.layout.page_logs
+            R.id.tab_web -> R.layout.page_web
+            else -> R.layout.page_dashboard
         }
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.container, fragment)
-            .commitAllowingStateLoss()
-        findViewById<MaterialToolbar>(R.id.toolbar).title = getString(titleRes)
+        val pageView = layoutInflater.inflate(layout, null)
+        return when (tab.root) {
+            R.id.tab_automation -> AutomationPage(this, pageView)
+            R.id.tab_logs -> LogsPage(this, pageView)
+            R.id.tab_web -> WebPage(this, pageView)
+            else -> DashboardPage(this, pageView)
+        }
+    }
+
+    private fun updateTabStyles(selected: Tab) {
+        val primary = resources.getColor(R.color.primary, theme)
+        val muted = resources.getColor(R.color.nav_unchecked, theme)
+        tabs.forEach { tab ->
+            val on = tab.root == selected.root
+            findViewById<ImageView>(tab.icon).setColorFilter(if (on) primary else muted, PorterDuff.Mode.SRC_IN)
+            findViewById<TextView>(tab.label).setTextColor(if (on) primary else muted)
+        }
+    }
+
+    override fun onDestroy() {
+        pages.values.forEach { it.onDestroy() }
+        pages.clear()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val KEY_TAB = "current_tab"
     }
 }
