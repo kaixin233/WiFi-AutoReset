@@ -27,7 +27,6 @@ class MainActivity : Activity() {
         Tab(R.id.tab_dashboard, R.id.iv_dashboard, R.id.tv_dashboard, R.string.title_dashboard),
         Tab(R.id.tab_automation, R.id.iv_automation, R.id.tv_automation, R.string.title_automation),
         Tab(R.id.tab_logs, R.id.iv_logs, R.id.tv_logs, R.string.title_logs),
-        Tab(R.id.tab_web, R.id.iv_web, R.id.tv_web, R.string.title_web),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,14 +112,12 @@ class MainActivity : Activity() {
         val layout = when (tab.root) {
             R.id.tab_automation -> R.layout.page_automation
             R.id.tab_logs -> R.layout.page_logs
-            R.id.tab_web -> R.layout.page_web
             else -> R.layout.page_dashboard
         }
         val pageView = layoutInflater.inflate(layout, null)
         return when (tab.root) {
             R.id.tab_automation -> AutomationPage(this, pageView)
             R.id.tab_logs -> LogsPage(this, pageView)
-            R.id.tab_web -> WebPage(this, pageView)
             else -> DashboardPage(this, pageView)
         }
     }

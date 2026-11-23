@@ -68,13 +68,12 @@ object MifiClient {
      * 失败时抛出带 HTTP 状态码与响应片段的异常，便于在界面/日志中定位。
      */
     @Synchronized
-    private fun request(action: String, method: String, body: String?): String {
+    private fun request(action: String): String {
         val file = if (action.startsWith("json_")) action else "json_$action"
         // 关键：固件自带 JS 的 callJSON 把时间戳直接拼在 file 参数值末尾（file=json_xxx<毫秒>），
         // 用来防缓存。独立的 &_t= 参数会被固件判为未知 action，返回 {"result":"1","msg":"api not found"}，
         // 这正是此前设备状态/信息/操作全部失效的根因。
-        val url = "$BASE$URI?method=${method.lowercase()}&module=duster" +
-            "&file=$file${System.currentTimeMillis()}"
+        val url = "$BASE$URI?method=get&module=duster&file=$file${System.currentTimeMillis()}"
 
         var lastError: Exception? = null
         // 固件偶发无响应/连接复位，做一次重试。
@@ -82,16 +81,11 @@ object MifiClient {
             try {
                 val challenge = fetchChallenge()
                 val conn = URL(url).openConnection() as HttpURLConnection
-                conn.requestMethod = method
-                conn.setRequestProperty("Authorization", authorization(method, challenge))
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("Authorization", authorization("GET", challenge))
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
                 conn.instanceFollowRedirects = true
-                if (body != null) {
-                    conn.doOutput = true
-                    conn.setRequestProperty("Content-Type", "application/json")
-                    conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                }
                 val code = conn.responseCode
                 val stream = if (code in 200..299) conn.inputStream else conn.errorStream
                 val text = try {
@@ -141,31 +135,8 @@ object MifiClient {
         throw lastError ?: ApiException("$file 请求失败")
     }
 
-    fun deviceInfo(): String = request("homepage_info", "GET", null)
-
-    /**
-     * 只读实时状态：电量百分比、充电状态、蜂窝信号等级、RSSI、在线设备数、运行时长。
-     * 对应固件首页的 json_status_info，不含任何写操作。
-     */
-    fun statusInfo(): String = request("status_info", "GET", null)
-
     /** 真·恢复出厂设置：固件中 lt_rm_btnResetFactory 对应的 json_device_restore_factory。 */
-    fun factoryReset(): String = request("device_restore_factory", "GET", null)
+    fun factoryReset(): String = request("device_restore_factory")
 
-    fun reboot(): String = request("device_restart", "GET", null)
-
-    fun resetTraffic(): String = request("statistics_set", "POST", "{\"reset\":\"1\"}")
-
-    fun reachable(): Boolean = try {
-        val conn = URL(BASE).openConnection() as HttpURLConnection
-        try {
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.responseCode in 200..399
-        } finally {
-            conn.disconnect()
-        }
-    } catch (e: Exception) {
-        false
-    }
+    fun reboot(): String = request("device_restart")
 }
