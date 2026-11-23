@@ -70,8 +70,11 @@ object MifiClient {
     @Synchronized
     private fun request(action: String, method: String, body: String?): String {
         val file = if (action.startsWith("json_")) action else "json_$action"
+        // 关键：固件自带 JS 的 callJSON 把时间戳直接拼在 file 参数值末尾（file=json_xxx<毫秒>），
+        // 用来防缓存。独立的 &_t= 参数会被固件判为未知 action，返回 {"result":"1","msg":"api not found"}，
+        // 这正是此前设备状态/信息/操作全部失效的根因。
         val url = "$BASE$URI?method=${method.lowercase()}&module=duster" +
-            "&file=$file&_t=${System.currentTimeMillis()}"
+            "&file=$file${System.currentTimeMillis()}"
 
         var lastError: Exception? = null
         // 固件偶发无响应/连接复位，做一次重试。
@@ -105,6 +108,11 @@ object MifiClient {
                 if (text.isBlank()) {
                     throw ApiException("$file 返回空内容（HTTP $code）", code)
                 }
+                // 固件对未知 action 会返回 HTTP 200 但内容是 {"result":"1","msg":"api not found"}。
+                // 必须识别为失败，否则界面会把无效数据当作"已更新"，操作也会误报"已执行"。
+                if (text.contains("api not found", ignoreCase = true)) {
+                    throw ApiException("$file 接口不被固件识别（api not found）", code)
+                }
                 AppLog.appendGlobal(
                     LogEntry(
                         LogEntry.now(),
@@ -118,6 +126,16 @@ object MifiClient {
                 return text
             } catch (e: Exception) {
                 lastError = e
+                // 每次尝试都记录失败，避免请求异常被静默吞掉导致无法诊断。
+                AppLog.appendGlobal(
+                    LogEntry(
+                        LogEntry.now(),
+                        "API 请求",
+                        if (attempt == 0) "失败" else "重试失败",
+                        file,
+                        e.message?.take(200).orEmpty(),
+                    ),
+                )
             }
         }
         throw lastError ?: ApiException("$file 请求失败")
