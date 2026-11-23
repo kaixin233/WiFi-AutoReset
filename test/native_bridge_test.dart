@@ -200,9 +200,9 @@ void main() {
     });
 
     test('浅色 Dock 背景必须半透明才能呈现玻璃折射', () {
-      expect(GlassPalette.light.dockTintTop.alpha, lessThan(255));
-      expect(GlassPalette.light.dockTintBottom.alpha, lessThan(255));
-      expect(GlassPalette.dark.dockTintTop.alpha, lessThan(255));
+      expect(GlassPalette.light.dockTintTop.a, lessThan(1.0));
+      expect(GlassPalette.light.dockTintBottom.a, lessThan(1.0));
+      expect(GlassPalette.dark.dockTintTop.a, lessThan(1.0));
     });
 
     testWidgets('液态玻璃底栏可渲染并切换选中项', (tester) async {
@@ -233,10 +233,11 @@ void main() {
       await tester.pumpAndSettle();
       final selected = tester.widget<Semantics>(
         find.byWidgetPredicate(
-          (widget) => widget is Semantics && widget.label == '自动化',
+          (widget) =>
+              widget is Semantics && widget.properties.label == '自动化',
         ),
       );
-      expect(selected.selected, isTrue);
+      expect(selected.properties.selected, isTrue);
     });
 
     test('明暗色板文字与背景对比方向正确', () {
