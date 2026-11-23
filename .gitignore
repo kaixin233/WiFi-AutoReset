@@ -1,13 +1,7 @@
-.dart_tool/
-.packages
-.pub-cache/
+.gradle/
 build/
 *.iml
 .idea/
-android/.gradle/
-android/local.properties
-android/app/debug/
-android/app/profile/
-android/app/release/
+local.properties
 *.apk
 .DS_Store

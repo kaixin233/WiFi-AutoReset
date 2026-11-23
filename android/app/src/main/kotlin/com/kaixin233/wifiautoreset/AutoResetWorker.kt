@@ -43,7 +43,7 @@ class AutoResetWorker(context: Context, params: WorkerParameters) : Worker(conte
 
         // 保留原有 work 名称，确保覆盖安装后 REPLACE 能接管旧版本遗留的定时任务。
         private const val WORK_NAME = "hourly_factory_reset"
-        // 与 Dart 端倒计时保持一致：每个周期起点后 5 秒执行。
+        // 与界面倒计时保持一致：每个周期起点后 5 秒执行。
         private const val OFFSET_MS = 5_000L
 
         fun getIntervalMinutes(context: Context): Int {
