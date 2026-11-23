@@ -11,8 +11,10 @@ android {
         applicationId = "com.kaixin233.wifiautoreset"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "2.0.1"
+        versionCode = 8
+        versionName = "2.0.2"
+        // Material/AppCompat/WorkManager 自带大量翻译，只保留中文资源可显著减小 resources.arsc。
+        resourceConfigurations += listOf("zh-rCN")
     }
 
     signingConfigs {
@@ -30,6 +32,13 @@ android {
         release {
             // 使用 V2 签名，避免 MIUI 报「解析软件包时出现问题 (33)」。
             signingConfig = signingConfigs.getByName("release")
+            // R8 代码压缩 + 资源压缩：DEX 占原包 85%，这是最有效的瘦身手段。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
         debug {
             signingConfig = signingConfigs.getByName("release")

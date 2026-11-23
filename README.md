@@ -43,9 +43,9 @@ gradle -p android :app:assembleRelease
 
 产物：`android/app/build/outputs/apk/release/app-release.apk`
 
-**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 **2.0.1+7**，versionCode = 7）。
+**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 **2.0.2+8**，versionCode = 8）。
 
-从 v1.0.3 起 Release 使用仓库内固定的 `android/app/release.p12`。v1.0.3 / v1.0.4 可直接覆盖升级到 v2.0.1，设置与日志数据保留。v1.0.1 / v1.0.2 使用早期 CI 自动生成的密钥，证书不同，需先卸载一次。
+从 v1.0.3 起 Release 使用仓库内固定的 `android/app/release.p12`。v1.0.3 / v1.0.4 可直接覆盖升级到 v2.0.2，设置与日志数据保留。release 构建已开启 R8 代码压缩与资源压缩，并只保留中文资源。v1.0.1 / v1.0.2 使用早期 CI 自动生成的密钥，证书不同，需先卸载一次。
 
 ## 权限
 
