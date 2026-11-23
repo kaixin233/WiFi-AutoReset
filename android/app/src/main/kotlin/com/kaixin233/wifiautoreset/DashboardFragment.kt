@@ -42,8 +42,8 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         super.onViewCreated(view, savedInstanceState)
 
         monitor = SpeedMonitor { rx, tx ->
-            Utils.asyncUi {
-                val v = view ?: return@asyncUi
+            activity?.runOnUiThread {
+                val v = view ?: return@runOnUiThread
                 v.find<TextView>(R.id.text_speed_down).text = Utils.formatSpeed(rx)
                 v.find<TextView>(R.id.text_speed_up).text = Utils.formatSpeed(tx)
             }
