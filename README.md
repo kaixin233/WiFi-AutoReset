@@ -2,7 +2,7 @@
 
 面向小米手机（Android 16、64 位）定制的随身 WiFi 自动化控制 App。
 
-**v2.0.0 起为纯原生 Kotlin Android 应用**：已彻底移除 Flutter 引擎与 Dart 代码，体积显著减小；底部导航改用标准 Material `BottomNavigationView`，界面为普通 Material 风格，明暗外观跟随系统。
+**v2.0.0 起为纯原生 Kotlin Android 应用**：已彻底移除 Flutter 引擎与 Dart 代码，体积显著减小；底部导航改用标准 Material `BottomNavigationView`，界面为普通 Material 风格，明暗外观跟随系统。v2.0.1 适配 Android 16 强制全屏（edge-to-edge），顶栏避开状态栏、底栏避开手势条与屏幕圆角，并统一卡片/按钮/标签圆角。
 
 ## 功能
 
@@ -27,7 +27,7 @@
 | 运营商 | CHN UNICOM（显示为「中国联通」） |
 | WiFi 名称 | MiFi-281F（固件以 UTF-16 code unit 十六进制返回） |
 | 认证方式 | HTTP Digest，realm `Highwmg`，`/login.cgi` 获取挑战 |
-| 操作接口 | `/xml_action.cgi?method=get&module=duster&file=json_<名称><时间戳>` |
+| 操作接口 | `/xml_action.cgi?method=get&module=duster&file=json_<名称>&_t=<时间戳>`（时间戳为独立参数） |
 
 恢复出厂设置对应固件的 `json_device_restore_factory`，执行后设备会重启并清空配置。若只想清零流量计数，请用「重置流量统计」（`json_statistics_set`）。
 
@@ -43,9 +43,9 @@ gradle -p android :app:assembleRelease
 
 产物：`android/app/build/outputs/apk/release/app-release.apk`
 
-**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 **2.0.0+6**，versionCode = 6）。
+**覆盖安装条件**：包名 `com.kaixin233.wifiautoreset` 不变、签名证书不变、`versionCode` 递增（当前 **2.0.1+7**，versionCode = 7）。
 
-从 v1.0.3 起 Release 使用仓库内固定的 `android/app/release.p12`。v1.0.3 / v1.0.4 可直接覆盖升级到 v2.0.0，设置与日志数据保留。v1.0.1 / v1.0.2 使用早期 CI 自动生成的密钥，证书不同，需先卸载一次。
+从 v1.0.3 起 Release 使用仓库内固定的 `android/app/release.p12`。v1.0.3 / v1.0.4 可直接覆盖升级到 v2.0.1，设置与日志数据保留。v1.0.1 / v1.0.2 使用早期 CI 自动生成的密钥，证书不同，需先卸载一次。
 
 ## 权限
 
@@ -64,7 +64,7 @@ gradle -p android :app:assembleRelease
 
 ```
 android/app/src/main/kotlin/com/kaixin233/wifiautoreset/
-  MainActivity.kt                    标准底栏与页面切换
+  MainActivity.kt                    标准底栏、全屏边角适配与页面切换
   DashboardFragment.kt               仪表盘
   AutomationFragment.kt              定时自动化
   LogsFragment.kt                    执行日志

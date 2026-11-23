@@ -1,6 +1,8 @@
 package com.kaixin233.wifiautoreset
 
 import android.content.res.Configuration
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -21,10 +23,16 @@ class MainActivity : AppCompatActivity() {
 
         // targetSdk 36 强制 edge-to-edge：必须显式处理状态栏/手势栏 inset，
         // 否则顶栏会被状态栏压住、底栏与手势条及屏幕圆角重叠。
-        WindowCompat.enableEdgeToEdge(window)
+        // 用 core 1.5+ 的 setDecorFitsSystemWindows（enableEdgeToEdge 需 core 1.17+）。
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
-        WindowCompat.getInsetsController(window, window.decorView)?.apply {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = !night
             isAppearanceLightNavigationBars = !night
         }
