@@ -78,11 +78,20 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     override fun onResume() {
         super.onResume()
         monitor?.start()
+        if (view != null) {
+            handler.removeCallbacks(statusTick)
+            handler.removeCallbacks(foregroundTick)
+            handler.post(statusTick)
+            handler.post(foregroundTick)
+        }
     }
 
     override fun onPause() {
         super.onPause()
         monitor?.stop()
+        // 退到后台后停止轮询，避免锁屏/切后台仍持续请求网关。
+        handler.removeCallbacks(statusTick)
+        handler.removeCallbacks(foregroundTick)
     }
 
     override fun onDestroyView() {
@@ -103,9 +112,10 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     private fun refreshGateway() {
         Utils.async(MifiClient::reachable) { ok, error ->
             val v = view ?: return@async
-            if (error == null) {
-                v.find<TextView>(R.id.text_gateway).text =
-                    if (ok == true) "网关在线" else "网关不可达"
+            v.find<TextView>(R.id.text_gateway).text = when {
+                error != null -> "网关检测失败"
+                ok == true -> "网关在线"
+                else -> "网关不可达"
             }
         }
     }

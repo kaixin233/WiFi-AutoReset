@@ -61,6 +61,8 @@ object AppLog {
             .edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
 
+    /** 后台定时任务与 UI 线程可能同时写，必须串行化，避免行交错/文件损坏。 */
+    @Synchronized
     fun append(context: Context, entry: LogEntry) {
         if (!isEnabled(context)) return
         val target = file(context)
@@ -71,6 +73,7 @@ object AppLog {
         }
     }
 
+    @Synchronized
     fun read(context: Context): List<LogEntry> {
         val target = file(context)
         if (!target.exists()) return emptyList()
@@ -83,6 +86,7 @@ object AppLog {
         }
     }
 
+    @Synchronized
     fun clear(context: Context) {
         file(context).writeText("")
     }

@@ -83,7 +83,8 @@ class AutomationFragment : Fragment(R.layout.fragment_automation) {
         presets.forEach { (id, value) -> v.find<Chip>(id).isChecked = value == minutes }
         val custom = v.find<Chip>(R.id.chip_custom)
         custom.isChecked = !isPreset
-        if (!isPreset) custom.text = "$minutes 分"
+        // 切回预设周期时必须还原文案，否则自定义分钟数会残留。
+        custom.text = if (isPreset) "自定义" else "$minutes 分"
     }
 
     private fun showCustomDialog() {
@@ -94,13 +95,17 @@ class AutomationFragment : Fragment(R.layout.fragment_automation) {
         }
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle("自定义执行周期")
-            .setMessage("请输入 5 ~ 1440 之间的分钟数")
+            .setMessage("请输入 ${AutoResetWorker.MIN_INTERVAL_MINUTES} ~ ${AutoResetWorker.MAX_INTERVAL_MINUTES} 之间的分钟数")
             .setView(input)
             .setNegativeButton("取消", null)
             .setPositiveButton("确定") { _, _ ->
                 val parsed = input.text.toString().trim().toIntOrNull()
-                if (parsed == null || parsed !in 5..1440) {
-                    Toast.makeText(requireContext(), "请输入 5 ~ 1440 之间的分钟数", Toast.LENGTH_SHORT).show()
+                if (parsed == null || parsed !in AutoResetWorker.MIN_INTERVAL_MINUTES..AutoResetWorker.MAX_INTERVAL_MINUTES) {
+                    Toast.makeText(
+                        requireContext(),
+                        "请输入 ${AutoResetWorker.MIN_INTERVAL_MINUTES} ~ ${AutoResetWorker.MAX_INTERVAL_MINUTES} 之间的分钟数",
+                        Toast.LENGTH_SHORT,
+                    ).show()
                     return@setPositiveButton
                 }
                 interval = parsed

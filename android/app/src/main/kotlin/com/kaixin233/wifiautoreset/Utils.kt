@@ -12,7 +12,8 @@ internal fun <T : View> View.find(id: Int): T = findViewById(id)
 
 /** 通用工具：线程切换、固件返回解析、显示格式化。 */
 object Utils {
-    private val io = Executors.newCachedThreadPool()
+    // 固定线程数，避免轮询与手动刷新叠加时无限创建线程。
+    private val io = Executors.newFixedThreadPool(4)
     private val main = Handler(Looper.getMainLooper())
 
     /** 后台执行 work，完成后回主线程回调；异常统一传回，不崩溃。 */

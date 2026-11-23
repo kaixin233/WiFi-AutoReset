@@ -3,21 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:clipToPadding="false">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="12dp"
+        android:paddingBottom="20dp">
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -45,11 +45,15 @@
                         android:textSize="12sp"
                         android:textColor="@color/text_muted" />
 
-                    <Button
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_refresh"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        style="@style/Widget.App.TextButton"
                         android:layout_width="wrap_content"
                         android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
                         android:text="刷新"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -118,9 +122,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -175,9 +177,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -217,8 +217,9 @@
                     android:text="--"
                     style="@style/CardHint" />
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_access"
+                    style="@style/Widget.App.Button"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:layout_marginTop="10dp"
@@ -231,9 +232,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -261,9 +260,7 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -279,6 +276,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_factory"
+                    style="@style/Widget.App.Button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
@@ -288,6 +286,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_reboot"
+                    style="@style/Widget.App.Button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -297,6 +296,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_traffic"
+                    style="@style/Widget.App.Button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"

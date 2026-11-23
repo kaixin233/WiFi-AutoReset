@@ -42,6 +42,13 @@ class WebFragment : Fragment(R.layout.fragment_web) {
                 error: WebResourceError?,
             ) {
                 progress?.visibility = View.GONE
+                if (request?.isForMainFrame == true) {
+                    Toast.makeText(
+                        requireContext(),
+                        "管理页加载失败，请确认已连接随身 WiFi",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
             }
         }
         web.loadUrl("http://192.168.1.1")
@@ -95,7 +102,11 @@ class WebFragment : Fragment(R.layout.fragment_web) {
     }
 
     override fun onDestroyView() {
-        webView?.destroy()
+        webView?.let { web ->
+            (web.parent as? android.view.ViewGroup)?.removeView(web)
+            web.stopLoading()
+            web.destroy()
+        }
         webView = null
         progress = null
         super.onDestroyView()

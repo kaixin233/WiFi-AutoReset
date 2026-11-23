@@ -14,9 +14,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -62,9 +60,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -90,6 +86,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="15 分" />
 
                     <com.google.android.material.chip.Chip
@@ -97,6 +94,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="30 分" />
 
                     <com.google.android.material.chip.Chip
@@ -104,6 +102,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="1 小时" />
 
                     <com.google.android.material.chip.Chip
@@ -111,6 +110,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="2 小时" />
 
                     <com.google.android.material.chip.Chip
@@ -118,6 +118,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="6 小时" />
 
                     <com.google.android.material.chip.Chip
@@ -125,6 +126,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="12 小时" />
 
                     <com.google.android.material.chip.Chip
@@ -132,6 +134,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checkable="true"
+                        style="@style/Widget.App.Chip"
                         android:text="自定义" />
                 </com.google.android.material.chip.ChipGroup>
 
@@ -148,9 +151,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            style="@style/Widget.App.Card">
 
             <TextView
                 android:layout_width="match_parent"
@@ -163,6 +164,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_save"
+            style="@style/Widget.App.Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="保存设置"
