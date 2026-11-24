@@ -22,6 +22,7 @@ class AutomationPage(
 
     private val handler = Handler(Looper.getMainLooper())
     private var enabled = false
+    private var smart = true
     private var interval = AlarmScheduler.DEFAULT_INTERVAL_MINUTES
     private var active = false
 
@@ -43,8 +44,9 @@ class AutomationPage(
     }
 
     init {
-        val prefs = activity.getSharedPreferences(AlarmScheduler.PREFS, Context.MODE_PRIVATE)
+        val prefs = AlarmScheduler.prefs(activity)
         enabled = prefs.getBoolean(AlarmScheduler.KEY_ENABLED, false)
+        smart = prefs.getBoolean(AlarmScheduler.KEY_SMART, true)
         interval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
             .coerceIn(AlarmScheduler.MIN_INTERVAL_MINUTES, AlarmScheduler.MAX_INTERVAL_MINUTES)
 
@@ -54,6 +56,13 @@ class AutomationPage(
             enabled = checked
             updateStatus()
             updateCountdown()
+        }
+
+        val switchSmart = view.find<Switch>(R.id.switch_smart)
+        switchSmart.isChecked = smart
+        switchSmart.setOnCheckedChangeListener { _, checked ->
+            smart = checked
+            updateStatus()
         }
 
         // 逐项点击监听，避免 RadioGroup 在程序设置 isChecked 时递归回调。
@@ -121,27 +130,36 @@ class AutomationPage(
     }
 
     private fun save() {
-        activity.getSharedPreferences(AlarmScheduler.PREFS, Context.MODE_PRIVATE).edit()
+        // 先落盘全部设置，再调度，确保 AlarmReceiver / BootReceiver 读到最新值。
+        AlarmScheduler.prefs(activity).edit()
             .putBoolean(AlarmScheduler.KEY_ENABLED, enabled)
+            .putBoolean(AlarmScheduler.KEY_SMART, smart)
             .putInt(AlarmScheduler.KEY_INTERVAL_MINUTES, interval)
             .apply()
         if (enabled) {
             AlarmScheduler.schedule(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务", "手动", "开启", "每 $interval 分钟执行恢复出厂"))
+            AppLog.append(
+                activity,
+                LogEntry(
+                    LogEntry.now(), "定时任务", "手动", "开启",
+                    "每 $interval 分钟执行恢复出厂${if (smart) "（智能调度：繁忙延缓）" else ""}",
+                ),
+            )
         } else {
             AlarmScheduler.cancel(activity)
             AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务", "手动", "关闭", "定时任务已关闭"))
         }
         Toast.makeText(
             activity,
-            if (enabled) "已开启：${Utils.intervalLabel(interval)}" else "定时任务已关闭",
+            if (enabled) "已开启：${Utils.intervalLabel(interval)}${if (smart) " · 智能" else ""}" else "定时任务已关闭",
             Toast.LENGTH_SHORT,
         ).show()
     }
 
     private fun updateStatus() {
+        val smartText = if (smart) "智能调度（忙时延缓）" else "准时执行"
         view.find<TextView>(R.id.text_schedule_status).text =
-            "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"} · 周期起点后 5 秒执行"
+            "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"} · $smartText"
     }
 
     private fun updateCountdown() {

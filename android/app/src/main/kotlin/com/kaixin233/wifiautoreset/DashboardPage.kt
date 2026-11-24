@@ -5,31 +5,18 @@ import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 
-/** 仪表盘页面控制器（纯原生 View，无 Fragment）。 */
+/** 仪表盘页面控制器（纯原生 View，无 Fragment）：实时网速 + 设备操作。 */
 class DashboardPage(
     private val activity: Activity,
     override val view: View,
 ) : PageController {
 
     private var monitor: SpeedMonitor? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private var active = false
-
-    private val foregroundTick = object : Runnable {
-        override fun run() {
-            if (!active) return
-            refreshForeground()
-            handler.postDelayed(this, 3_000)
-        }
-    }
 
     init {
         monitor = SpeedMonitor { rx, tx ->
@@ -39,9 +26,6 @@ class DashboardPage(
             }
         }
 
-        view.find<Button>(R.id.btn_access).setOnClickListener {
-            activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
         view.find<Button>(R.id.btn_factory).setOnClickListener {
             confirm("恢复出厂设置", "此操作会清空随身 WiFi 全部配置并重启，手机将断网。确认继续？") { MifiClient.factoryReset() }
         }
@@ -62,42 +46,16 @@ class DashboardPage(
     }
 
     override fun onShow() {
-        if (active) return
-        active = true
         monitor?.start()
-        refreshForeground()
-        handler.post(foregroundTick)
     }
 
     override fun onHide() {
-        active = false
         monitor?.stop()
-        handler.removeCallbacks(foregroundTick)
     }
 
     override fun onDestroy() {
         onHide()
         monitor = null
-    }
-
-    private fun refreshForeground() {
-        val ctx = activity
-        Utils.async({
-            val detector = ForegroundAppDetector(ctx)
-            val granted = detector.hasPermission()
-            val pkg = detector.currentPackage()
-            Triple(granted, pkg, detector.labelOf(pkg))
-        }) { result, error ->
-            if (error != null) return@async
-            val (granted, pkg, label) = result ?: return@async
-            view.find<Button>(R.id.btn_access).visibility = if (granted) View.GONE else View.VISIBLE
-            val hasApp = granted && !pkg.isNullOrBlank()
-            view.find<TextView>(R.id.text_foreground_label).text = if (hasApp) label else "等待窗口事件"
-            view.find<TextView>(R.id.text_foreground_pkg).text =
-                if (hasApp) pkg else "切换一次应用即可获取包名"
-            view.find<TextView>(R.id.text_foreground_time).text =
-                if (hasApp) "更新于 ${ForegroundAppDetector(ctx).lastTime()}" else "--"
-        }
     }
 
     private fun confirm(title: String, message: String, action: () -> String) {
