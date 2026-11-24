@@ -40,6 +40,14 @@
                 android:textSize="26sp"
                 android:textStyle="bold" />
 
+            <TextView
+                android:id="@+id/text_next_absolute"
+                style="@style/CardHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="下次执行：--" />
+
             <Switch
                 android:id="@+id/switch_enabled"
                 android:layout_width="match_parent"

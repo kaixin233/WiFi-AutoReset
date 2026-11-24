@@ -165,5 +165,7 @@ class AutomationPage(
     private fun updateCountdown() {
         view.find<TextView>(R.id.text_countdown).text =
             if (enabled) Utils.countdownText(interval) else "--:--:--"
+        view.find<TextView>(R.id.text_next_absolute).text =
+            if (enabled) "下次执行：${Utils.nextRunAbsolute(interval)}" else "下次执行：未启用"
     }
 }

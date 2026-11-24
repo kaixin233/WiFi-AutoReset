@@ -1,6 +1,8 @@
 package com.kaixin233.wifiautoreset
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PorterDuff
@@ -42,6 +44,18 @@ class MainActivity : Activity() {
         val savedTab = savedInstanceState?.getInt(KEY_TAB, R.id.tab_dashboard) ?: R.id.tab_dashboard
         val initial = tabs.firstOrNull { it.root == savedTab } ?: tabs[0]
         switchTo(initial, force = true)
+
+        requestNotificationPermissionIfNeeded()
+    }
+
+    /** Android 13+ 首次进入时申请通知权限，用于定时任务执行结果提示。 */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) return
+        // 系统对已选「不再询问」的请求不会再次弹窗，直接申请即可。
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATION)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -140,5 +154,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val KEY_TAB = "current_tab"
+        private const val REQ_NOTIFICATION = 2001
     }
 }

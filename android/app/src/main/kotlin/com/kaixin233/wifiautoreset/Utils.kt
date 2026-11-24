@@ -3,6 +3,8 @@ package com.kaixin233.wifiautoreset
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -17,15 +19,7 @@ object Utils {
 
     /** 后台执行 work，完成后回主线程回调；异常统一传回，不崩溃。 */
     fun asyncUi(work: () -> Unit, ui: (Exception?) -> Unit) {
-        io.execute {
-            var error: Exception? = null
-            try {
-                work()
-            } catch (e: Exception) {
-                error = e
-            }
-            main.post { ui(error) }
-        }
+        async<Unit>(work) { _, error -> ui(error) }
     }
 
     /** 后台执行并返回结果，完成后回主线程。value 与 error 必有一个为 null。 */
@@ -68,5 +62,11 @@ object Utils {
         minutes == 1440 -> "每天"
         minutes >= 60 && minutes % 60 == 0 -> "每 ${minutes / 60} 小时"
         else -> "每 $minutes 分钟"
+    }
+
+    /** 下次执行的本地绝对时间，如「11-25 14:00」。 */
+    fun nextRunAbsolute(intervalMinutes: Int, now: Long = System.currentTimeMillis()): String {
+        val fmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+        return fmt.format(Date(nextRunMillis(intervalMinutes, now)))
     }
 }

@@ -22,14 +22,6 @@ data class LogEntry(
         put("detail", detail)
     }
 
-    fun toMap(): Map<String, Any> = mapOf(
-        "time" to time,
-        "action" to action,
-        "mode" to mode,
-        "result" to result,
-        "detail" to detail,
-    )
-
     companion object {
         fun now(): String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 

@@ -27,7 +27,12 @@ class DashboardPage(
         }
 
         view.find<Button>(R.id.btn_factory).setOnClickListener {
-            confirm("恢复出厂设置", "此操作会清空随身 WiFi 全部配置并重启，手机将断网。确认继续？") { MifiClient.factoryReset() }
+            confirm("恢复出厂设置", "此操作会清空随身 WiFi 全部配置并重启，手机将断网。确认继续？") {
+                val body = MifiClient.factoryReset()
+                // 手动重置同样刷新智能调度的基准快照，避免下次定时判断混入旧流量。
+                ResetSnapshot.mark(activity.applicationContext)
+                body
+            }
         }
         view.find<Button>(R.id.btn_reboot).setOnClickListener {
             confirm("重启设备", "设备会短暂断网后重新上线，配置不会丢失。确认继续？") { MifiClient.reboot() }

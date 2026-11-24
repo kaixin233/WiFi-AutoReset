@@ -3,9 +3,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android 13+ 执行结果通知需运行时申请，未授予时静默跳过、不影响主流程。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Android 12+ 使用 setExact* 闹钟必须声明；未获授权时 AlarmScheduler 自动降级为
          setAndAllowWhileIdle，避免 SecurityException 导致「保存设置」闪退。 -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- AlarmReceiver 用 WakeLock 保底执行，避免 goAsync 10 秒窗口超时。 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="@string/app_name"
@@ -18,7 +22,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|uiMode"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
