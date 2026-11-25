@@ -29,8 +29,10 @@ class DashboardPage(
         view.find<Button>(R.id.btn_factory).setOnClickListener {
             confirm("恢复出厂设置", "此操作会清空随身 WiFi 全部配置并重启，手机将断网。确认继续？") {
                 val body = MifiClient.factoryReset()
-                // 手动重置同样刷新智能调度的基准快照，避免下次定时判断混入旧流量。
-                ResetSnapshot.mark(activity.applicationContext)
+                // 手动重置成功后刷新计时基准并重新排程：倒计时从这一刻重新开始。
+                val app = activity.applicationContext
+                AlarmScheduler.markReset(app)
+                if (AlarmScheduler.isEnabled(app)) AlarmScheduler.schedule(app)
                 body
             }
         }

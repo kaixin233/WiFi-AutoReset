@@ -11,7 +11,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 
 /**
- * 执行结果通知：定时重置成功 / 失败 / 强制 / 延缓时提示用户。
+ * 执行结果通知：定时重置成功 / 失败时提示用户。
  * 无 POST_NOTIFICATIONS 权限（Android 13+）时静默跳过，不影响主流程。
  *
  * 注意：为避免引入 AndroidX 依赖破坏「零依赖纯原生」，这里不使用 NotificationCompat，
@@ -33,7 +33,7 @@ object Notifier {
                     CHANNEL_NAME,
                     NotificationManager.IMPORTANCE_DEFAULT,
                 )
-                channel.description = "定时重置的执行结果与智能调度决策"
+                channel.description = "定时恢复出厂设置的执行结果"
                 manager(context).createNotificationChannel(channel)
             }
         }

@@ -22,17 +22,15 @@ class AutomationPage(
 
     private val handler = Handler(Looper.getMainLooper())
     private var enabled = false
-    private var smart = true
     private var interval = AlarmScheduler.DEFAULT_INTERVAL_MINUTES
     private var active = false
 
+    // 常用档位：6 / 12 小时已移除，保留到 2 小时 + 自定义。
     private val presets = mapOf(
         R.id.chip_15 to 15,
         R.id.chip_30 to 30,
         R.id.chip_60 to 60,
         R.id.chip_120 to 120,
-        R.id.chip_360 to 360,
-        R.id.chip_720 to 720,
     )
 
     private val tick = object : Runnable {
@@ -46,7 +44,6 @@ class AutomationPage(
     init {
         val prefs = AlarmScheduler.prefs(activity)
         enabled = prefs.getBoolean(AlarmScheduler.KEY_ENABLED, false)
-        smart = prefs.getBoolean(AlarmScheduler.KEY_SMART, true)
         interval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
             .coerceIn(AlarmScheduler.MIN_INTERVAL_MINUTES, AlarmScheduler.MAX_INTERVAL_MINUTES)
 
@@ -56,13 +53,6 @@ class AutomationPage(
             enabled = checked
             updateStatus()
             updateCountdown()
-        }
-
-        val switchSmart = view.find<Switch>(R.id.switch_smart)
-        switchSmart.isChecked = smart
-        switchSmart.setOnCheckedChangeListener { _, checked ->
-            smart = checked
-            updateStatus()
         }
 
         // 逐项点击监听，避免 RadioGroup 在程序设置 isChecked 时递归回调。
@@ -130,42 +120,58 @@ class AutomationPage(
     }
 
     private fun save() {
-        // 先落盘全部设置，再调度，确保 AlarmReceiver / BootReceiver 读到最新值。
-        AlarmScheduler.prefs(activity).edit()
+        val prefs = AlarmScheduler.prefs(activity)
+        val wasEnabled = prefs.getBoolean(AlarmScheduler.KEY_ENABLED, false)
+        val oldInterval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
+
+        // 先落盘设置，再处理基准与排程，确保 Receiver / BootReceiver 读到最新值。
+        prefs.edit()
             .putBoolean(AlarmScheduler.KEY_ENABLED, enabled)
-            .putBoolean(AlarmScheduler.KEY_SMART, smart)
             .putInt(AlarmScheduler.KEY_INTERVAL_MINUTES, interval)
             .apply()
+
         if (enabled) {
+            val base = AlarmScheduler.lastResetAt(activity)
+            val next = AlarmScheduler.nextRunMillis(activity)
+            // 首次启用、周期变化、或基准已过期时，以当前时刻重建计时起点：
+            // 保证倒计时从「现在」开始，而不会立刻触发一次重置。
+            if (base <= 0L || next <= System.currentTimeMillis() ||
+                (wasEnabled && oldInterval != interval)
+            ) {
+                AlarmScheduler.markReset(activity)
+            }
             AlarmScheduler.schedule(activity)
             AppLog.append(
                 activity,
                 LogEntry(
                     LogEntry.now(), "定时任务", "手动", "开启",
-                    "每 $interval 分钟执行恢复出厂${if (smart) "（智能调度：繁忙延缓）" else ""}",
+                    "每 $interval 分钟执行恢复出厂，从最近一次重置开始计时",
                 ),
             )
+            Toast.makeText(activity, "已开启：${Utils.intervalLabel(interval)}", Toast.LENGTH_SHORT).show()
         } else {
             AlarmScheduler.cancel(activity)
             AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务", "手动", "关闭", "定时任务已关闭"))
+            Toast.makeText(activity, "定时任务已关闭", Toast.LENGTH_SHORT).show()
         }
-        Toast.makeText(
-            activity,
-            if (enabled) "已开启：${Utils.intervalLabel(interval)}${if (smart) " · 智能" else ""}" else "定时任务已关闭",
-            Toast.LENGTH_SHORT,
-        ).show()
+        updateCountdown()
     }
 
     private fun updateStatus() {
-        val smartText = if (smart) "智能调度（忙时延缓）" else "准时执行"
         view.find<TextView>(R.id.text_schedule_status).text =
-            "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"} · $smartText"
+            "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"}"
     }
 
     private fun updateCountdown() {
-        view.find<TextView>(R.id.text_countdown).text =
-            if (enabled) Utils.countdownText(interval) else "--:--:--"
-        view.find<TextView>(R.id.text_next_absolute).text =
-            if (enabled) "下次执行：${Utils.nextRunAbsolute(interval)}" else "下次执行：未启用"
+        val countdown = view.find<TextView>(R.id.text_countdown)
+        val absolute = view.find<TextView>(R.id.text_next_absolute)
+        if (!enabled) {
+            countdown.text = "--:--:--"
+            absolute.text = "下次执行：未启用"
+            return
+        }
+        val next = AlarmScheduler.nextRunMillis(activity)
+        countdown.text = Utils.countdownText(next)
+        absolute.text = "下次执行：${Utils.absoluteText(next)}"
     }
 }

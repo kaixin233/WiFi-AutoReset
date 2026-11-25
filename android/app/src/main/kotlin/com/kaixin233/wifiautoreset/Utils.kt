@@ -43,14 +43,9 @@ object Utils {
         else -> String.format(Locale.getDefault(), "%.2f MB/s", bytes / (1024.0 * 1024.0))
     }
 
-    /** 按 Unix 纪元对齐到周期起点后 5 秒，与 AlarmManager 排程一致。 */
-    fun nextRunMillis(intervalMinutes: Int, now: Long = System.currentTimeMillis()): Long {
-        val slot = intervalMinutes * 60_000L
-        return ((now / slot) + 1) * slot + 5_000L
-    }
-
-    fun countdownText(intervalMinutes: Int, now: Long = System.currentTimeMillis()): String {
-        val diff = nextRunMillis(intervalMinutes, now) - now
+    /** 距离目标时间戳的倒计时，如「00:59:58」。targetMillis <= now 时返回「即将执行」。 */
+    fun countdownText(targetMillis: Long, now: Long = System.currentTimeMillis()): String {
+        val diff = targetMillis - now
         if (diff <= 0) return "即将执行"
         val hours = diff / 3_600_000
         val minutes = (diff % 3_600_000) / 60_000
@@ -64,9 +59,7 @@ object Utils {
         else -> "每 $minutes 分钟"
     }
 
-    /** 下次执行的本地绝对时间，如「11-25 14:00」。 */
-    fun nextRunAbsolute(intervalMinutes: Int, now: Long = System.currentTimeMillis()): String {
-        val fmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-        return fmt.format(Date(nextRunMillis(intervalMinutes, now)))
-    }
+    /** 把时间戳格式化为本地绝对时间，如「11-25 14:00」。 */
+    fun absoluteText(timeMillis: Long): String =
+        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(timeMillis))
 }

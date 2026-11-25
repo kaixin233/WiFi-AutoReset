@@ -56,15 +56,6 @@
                 android:text="启用定时任务"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp" />
-
-            <Switch
-                android:id="@+id/switch_smart"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="智能调度（忙时延缓）"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -150,34 +141,6 @@
                     android:textSize="13sp" />
 
                 <RadioButton
-                    android:id="@+id/chip_360"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_chip"
-                    android:button="@null"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:text="6 小时"
-                    android:textAllCaps="false"
-                    android:textColor="@color/chip_text_color"
-                    android:textSize="13sp" />
-
-                <RadioButton
-                    android:id="@+id/chip_720"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_chip"
-                    android:button="@null"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:text="12 小时"
-                    android:textAllCaps="false"
-                    android:textColor="@color/chip_text_color"
-                    android:textSize="13sp" />
-
-                <RadioButton
                     android:id="@+id/chip_custom"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
@@ -197,7 +160,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="周期 60 分钟时按整点后 5 秒执行。修改后需点击保存设置。" />
+                android:text="倒计时从最近一次恢复出厂设置开始计时，到点自动重置并重新计时。修改后需点击保存设置。" />
         </LinearLayout>
 
         <LinearLayout
@@ -213,7 +176,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:lineSpacingExtra="4dp"
-                android:text="• 智能调度：到点先测网速，低于 500 KB/s 视为空闲/疑似被云控，立即重置；达到 500 KB/s 视为繁忙，每 5 分钟延缓一次，最多 6 次后强制执行，避免打断使用。\n• 每次执行都会真实调用固件接口并清空随身 WiFi 配置，手机会断网。\n• 系统省电策略可能让任务延迟数分钟。\n• 执行结果会写入日志页。" />
+                android:text="• 计时起点为最近一次恢复出厂设置的时间，手动重置后会自动重新计时。\n• 每次执行都会真实调用固件接口并清空随身 WiFi 配置，手机会断网。\n• 系统省电策略可能让任务延迟数分钟。\n• 执行结果会写入日志页。" />
         </LinearLayout>
 
         <Button

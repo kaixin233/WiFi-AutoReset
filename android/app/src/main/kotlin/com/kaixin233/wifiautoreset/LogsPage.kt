@@ -2,23 +2,59 @@ package com.kaixin233.wifiautoreset
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.ArrayAdapter
+import android.view.ViewGroup
+import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.ListView
 import android.widget.Switch
 import android.widget.TextView
 
-/** 日志页面控制器。 */
+/** 日志页面控制器：卡片式展示执行记录，按结果着色，便于快速浏览。 */
 class LogsPage(
     private val activity: Activity,
     override val view: View,
 ) : PageController {
 
-    private lateinit var adapter: ArrayAdapter<String>
+    private inner class LogAdapter : BaseAdapter() {
+        private var items: List<LogEntry> = emptyList()
+
+        fun submit(data: List<LogEntry>) {
+            items = data
+            notifyDataSetChanged()
+        }
+
+        override fun getCount() = items.size
+        override fun getItem(position: Int) = items[position]
+        override fun getItemId(position: Int) = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val row = convertView ?: LayoutInflater.from(activity)
+                .inflate(R.layout.item_log, parent, false)
+            val item = getItem(position)
+
+            row.find<TextView>(R.id.log_time).text = item.time
+            row.find<TextView>(R.id.log_mode).text = item.mode
+            row.find<TextView>(R.id.log_action).text = item.action
+            row.find<TextView>(R.id.log_detail).text = item.detail
+
+            val badge = row.find<TextView>(R.id.log_result)
+            badge.text = item.result
+            val color = when {
+                item.result.contains("失败") -> R.color.danger
+                item.result == "成功" || item.result == "已开启" -> R.color.success
+                item.result == "关闭" || item.result == "已关闭" -> R.color.nav_unchecked
+                else -> R.color.primary
+            }
+            badge.setTextColor(activity.resources.getColor(color, activity.theme))
+            return row
+        }
+    }
+
+    private val adapter = LogAdapter()
 
     init {
-        adapter = ArrayAdapter<String>(activity, android.R.layout.simple_list_item_1)
         view.find<ListView>(R.id.list_logs).adapter = adapter
 
         val switchLogs = view.find<Switch>(R.id.switch_logs)
@@ -52,14 +88,7 @@ class LogsPage(
 
     private fun refresh() {
         val logs = AppLog.read(activity)
-        adapter.clear()
-        adapter.addAll(logs.map { entry ->
-            buildString {
-                appendLine("${entry.time}  ${entry.action} · ${entry.result}（${entry.mode}）")
-                append(entry.detail)
-            }
-        })
-        adapter.notifyDataSetChanged()
+        adapter.submit(logs)
         view.find<TextView>(R.id.text_empty).visibility = if (logs.isEmpty()) View.VISIBLE else View.GONE
         view.find<TextView>(R.id.text_logs_hint).visibility =
             if (AppLog.isEnabled(activity)) View.GONE else View.VISIBLE
