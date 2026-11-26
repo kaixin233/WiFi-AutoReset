@@ -55,6 +55,8 @@ class DashboardPage(
         automation?.onShow()
         logs?.onShow()
         syncOverlaySwitch()
+        // 划掉任务卡片后服务可能被回收：开关仍开时补拉，避免开关显示打开却没有悬浮窗。
+        OverlayService.ensureRunning(activity)
     }
 
     override fun onHide() {

@@ -43,6 +43,17 @@ object Utils {
         else -> String.format(Locale.getDefault(), "%.2f MB/s", bytes / (1024.0 * 1024.0))
     }
 
+    /**
+     * 悬浮窗专用：数值固定 5 位宽 + 固定单位宽度，配合等宽字体使文字总长度稳定，
+     * 避免网速跳动时窗口尺寸跟着闪动。
+     */
+    fun formatSpeedFixed(bytes: Long): String = when {
+        bytes <= 0 -> String.format(Locale.ROOT, "%5d  B/s", 0)
+        bytes < 1024 -> String.format(Locale.ROOT, "%5d  B/s", bytes)
+        bytes < 1024 * 1024 -> String.format(Locale.ROOT, "%5.1f KB/s", bytes / 1024.0)
+        else -> String.format(Locale.ROOT, "%5.2f MB/s", bytes / (1024.0 * 1024.0))
+    }
+
     /** 距离目标时间戳的倒计时，如「00:59:58」。targetMillis <= now 时返回「即将执行」。 */
     fun countdownText(targetMillis: Long, now: Long = System.currentTimeMillis()): String {
         val diff = targetMillis - now
