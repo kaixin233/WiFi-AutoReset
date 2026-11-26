@@ -35,17 +35,14 @@ class LogsPage(
             val item = getItem(position)
 
             row.find<TextView>(R.id.log_time).text = item.time
-            row.find<TextView>(R.id.log_mode).text = item.mode
             row.find<TextView>(R.id.log_action).text = item.action
-            row.find<TextView>(R.id.log_detail).text = item.detail
 
             val badge = row.find<TextView>(R.id.log_result)
             badge.text = item.result
             val color = when {
                 item.result.contains("失败") -> R.color.danger
-                item.result == "成功" || item.result == "已开启" -> R.color.success
-                item.result == "关闭" || item.result == "已关闭" -> R.color.nav_unchecked
-                else -> R.color.primary
+                item.result.contains("成功") || item.result == "已开启" -> R.color.success
+                else -> R.color.nav_unchecked
             }
             badge.setTextColor(activity.resources.getColor(color, activity.theme))
             return row
@@ -62,9 +59,9 @@ class LogsPage(
         switchLogs.setOnCheckedChangeListener { _, checked ->
             if (checked) {
                 AppLog.setEnabled(activity, true)
-                AppLog.append(activity, LogEntry(LogEntry.now(), "日志设置", "手动", "已开启", "后续操作将写入执行日志"))
+                AppLog.append(activity, LogEntry(LogEntry.now(), "日志已开启", "成功"))
             } else {
-                AppLog.append(activity, LogEntry(LogEntry.now(), "日志设置", "手动", "已关闭", "后续操作不再写入执行日志"))
+                AppLog.append(activity, LogEntry(LogEntry.now(), "日志已关闭", "成功"))
                 AppLog.setEnabled(activity, false)
             }
             refresh()

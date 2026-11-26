@@ -77,7 +77,7 @@ object MifiClient {
 
         var lastError: Exception? = null
         // 固件偶发无响应/连接复位，做一次重试。
-        repeat(2) { attempt ->
+        repeat(2) {
             try {
                 val challenge = fetchChallenge()
                 val conn = URL(url).openConnection() as HttpURLConnection
@@ -107,29 +107,10 @@ object MifiClient {
                 if (text.contains("api not found", ignoreCase = true)) {
                     throw ApiException("$file 接口不被固件识别（api not found）", code)
                 }
-                AppLog.appendGlobal(
-                    LogEntry(
-                        LogEntry.now(),
-                        "API 请求",
-                        if (attempt == 0) "成功" else "重试成功",
-                        file,
-                        "HTTP $code · ${text.take(200)}",
-                    ),
-                )
                 lastError = null
                 return text
             } catch (e: Exception) {
                 lastError = e
-                // 每次尝试都记录失败，避免请求异常被静默吞掉导致无法诊断。
-                AppLog.appendGlobal(
-                    LogEntry(
-                        LogEntry.now(),
-                        "API 请求",
-                        if (attempt == 0) "失败" else "重试失败",
-                        file,
-                        e.message?.take(200).orEmpty(),
-                    ),
-                )
             }
         }
         throw lastError ?: ApiException("$file 请求失败")

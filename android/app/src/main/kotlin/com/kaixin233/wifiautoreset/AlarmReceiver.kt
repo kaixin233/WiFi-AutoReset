@@ -21,7 +21,6 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AlarmScheduler.ACTION_RESET) return
         val app = context.applicationContext
-        AppLog.init(app)
 
         val power = app.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val lock = power?.newWakeLock(
@@ -36,7 +35,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     runTask(app)
                 } catch (e: Exception) {
                     val msg = e.message ?: "未知异常"
-                    AppLog.append(app, LogEntry(LogEntry.now(), "恢复出厂设置", "定时", "失败", msg))
+                    AppLog.append(app, LogEntry(LogEntry.now(), "恢复出厂设置", "失败"))
                     Notifier.notify(app, "定时重置失败", msg)
                     // 异常也要排下一次，避免任务彻底停止。
                     AlarmScheduler.schedule(app)
@@ -58,9 +57,8 @@ class AlarmReceiver : BroadcastReceiver() {
 
     private fun runTask(app: Context) {
         // 执行真实恢复出厂。
-        val body = MifiClient.factoryReset()
-        val result = if (body.contains("success", ignoreCase = true)) "成功" else "已发送"
-        AppLog.append(app, LogEntry(LogEntry.now(), "恢复出厂设置", "定时", result, body.take(300)))
+        MifiClient.factoryReset()
+        AppLog.append(app, LogEntry(LogEntry.now(), "恢复出厂设置", "成功"))
 
         // 成功后刷新计时基准：下次执行 = 本次重置时间 + 一个周期。
         AlarmScheduler.markReset(app)

@@ -20,6 +20,10 @@ import android.os.Build
 object Notifier {
     private const val CHANNEL_ID = "wifi_auto_reset_result"
     private const val CHANNEL_NAME = "执行结果"
+    private const val KEEPALIVE_CHANNEL_ID = "wifi_auto_reset_keepalive"
+    private const val KEEPALIVE_CHANNEL_NAME = "后台守护"
+    /** 前台服务通知 id 必须固定且区别于结果通知（1001）。 */
+    const val KEEPALIVE_NOTIFICATION_ID = 1002
 
     private fun manager(context: Context): NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -73,5 +77,52 @@ object Notifier {
             .setShowWhen(true)
             .build()
         manager(context).notify(1001, notification)
+    }
+
+    /**
+     * 前台守护服务的常驻通知：低优先级、静默、不震动。
+     * 作用仅是把进程维持在前台优先级，防止 MIUI 划卡时按 force-stop 处理、
+     * 连带清除 AlarmManager 闹钟；服务本身不做任何轮询，零额外耗电。
+     * 前台服务通知不受 POST_NOTIFICATIONS 影响，无需检查权限。
+     */
+    fun keepaliveNotification(context: Context): Notification {
+        ensureKeepaliveChannel(context)
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pi = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, KEEPALIVE_CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+        }
+        return builder
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setContentTitle("定时重置守护中")
+            .setContentText("后台保持激活，确保定时重置准时执行")
+            .setContentIntent(pi)
+            .setOngoing(true)
+            .setShowWhen(false)
+            .build()
+    }
+
+    private fun ensureKeepaliveChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (manager(context).getNotificationChannel(KEEPALIVE_CHANNEL_ID) == null) {
+                val channel = NotificationChannel(
+                    KEEPALIVE_CHANNEL_ID,
+                    KEEPALIVE_CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_LOW,
+                )
+                channel.description = "保持后台激活以确保定时任务执行，可隐藏此通知"
+                channel.setSound(null, null)
+                channel.enableVibration(false)
+                manager(context).createNotificationChannel(channel)
+            }
+        }
     }
 }

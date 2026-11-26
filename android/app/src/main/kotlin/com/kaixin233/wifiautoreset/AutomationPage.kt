@@ -67,6 +67,22 @@ class AutomationPage(
         view.find<RadioButton>(R.id.chip_custom).setOnClickListener { showCustomDialog() }
 
         view.find<Button>(R.id.btn_save).setOnClickListener { save() }
+        view.find<Button>(R.id.btn_autostart).setOnClickListener {
+            AlertDialog.Builder(activity)
+                .setTitle("开启自启动")
+                .setMessage("将跳转到系统的自启动管理页，请找到本应用并允许「自启动」和「关联启动」。不同手机菜单名称略有差异。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("去设置") { _, _ -> BootGuard.openAutoStart(activity) }
+                .show()
+        }
+        view.find<Button>(R.id.btn_battery).setOnClickListener {
+            AlertDialog.Builder(activity)
+                .setTitle("设置省电策略")
+                .setMessage("请在接下来的页面允许「忽略电池优化」或将本应用省电策略设为「无限制」，避免后台被冻结。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("去设置") { _, _ -> BootGuard.openBatteryOptimization(activity) }
+                .show()
+        }
         selectPreset(interval)
         updateStatus()
     }
@@ -141,17 +157,14 @@ class AutomationPage(
                 AlarmScheduler.markReset(activity)
             }
             AlarmScheduler.schedule(activity)
-            AppLog.append(
-                activity,
-                LogEntry(
-                    LogEntry.now(), "定时任务", "手动", "开启",
-                    "每 $interval 分钟执行恢复出厂，从最近一次重置开始计时",
-                ),
-            )
+            // 启动前台守护服务，防止 MIUI 划卡清除闹钟。
+            KeepAliveService.start(activity)
+            AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务已开启", "成功"))
             Toast.makeText(activity, "已开启：${Utils.intervalLabel(interval)}", Toast.LENGTH_SHORT).show()
         } else {
             AlarmScheduler.cancel(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务", "手动", "关闭", "定时任务已关闭"))
+            KeepAliveService.stop(activity)
+            AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务已关闭", "成功"))
             Toast.makeText(activity, "定时任务已关闭", Toast.LENGTH_SHORT).show()
         }
         updateCountdown()

@@ -8,7 +8,12 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            AlarmScheduler.schedule(context.applicationContext)
+            val app = context.applicationContext
+            if (AlarmScheduler.isEnabled(app)) {
+                // 任务启用时同步拉起前台守护服务，保住闹钟不被系统策略清除。
+                KeepAliveService.start(app)
+                AlarmScheduler.schedule(app)
+            }
         }
     }
 }

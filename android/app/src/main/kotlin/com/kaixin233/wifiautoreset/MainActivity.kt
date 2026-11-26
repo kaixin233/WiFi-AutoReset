@@ -33,7 +33,6 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppLog.init(this)
         setContentView(R.layout.activity_main)
         setupEdgeToEdge()
 
@@ -46,6 +45,9 @@ class MainActivity : Activity() {
         switchTo(initial, force = true)
 
         requestNotificationPermissionIfNeeded()
+        // 若定时任务已启用但守护服务未运行（如被系统清理后重新进入），补拉一次。
+        if (AlarmScheduler.isEnabled(this)) KeepAliveService.start(this)
+
     }
 
     /** Android 13+ 首次进入时申请通知权限，用于定时任务执行结果提示。 */

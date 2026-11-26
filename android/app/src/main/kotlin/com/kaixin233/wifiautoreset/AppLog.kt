@@ -7,19 +7,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** 一条执行记录只保留三要素：时间、行为、结果（成功 / 失败 / 已开启 / 已关闭）。 */
 data class LogEntry(
     val time: String,
     val action: String,
-    val mode: String,
     val result: String,
-    val detail: String,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("time", time)
         put("action", action)
-        put("mode", mode)
         put("result", result)
-        put("detail", detail)
     }
 
     companion object {
@@ -28,9 +25,7 @@ data class LogEntry(
         fun fromJson(o: JSONObject) = LogEntry(
             o.optString("time"),
             o.optString("action"),
-            o.optString("mode"),
             o.optString("result"),
-            o.optString("detail"),
         )
     }
 }
@@ -40,20 +35,6 @@ object AppLog {
     private const val MAX_LINES = 500
     private const val PREFS = "wifi_auto_reset"
     private const val KEY_ENABLED = "log_enabled"
-
-    /** 应用级上下文，用于后台线程/Receiver 无 Activity 时写日志。 */
-    @Volatile
-    var appContext: Context? = null
-        private set
-
-    fun init(context: Context) {
-        appContext = context.applicationContext
-    }
-
-    /** 无 Context 场景（如原生客户端内部）写日志；未初始化时静默跳过。 */
-    fun appendGlobal(entry: LogEntry) {
-        appContext?.let { append(it, entry) }
-    }
 
     private fun file(context: Context) = File(context.filesDir, FILE)
 

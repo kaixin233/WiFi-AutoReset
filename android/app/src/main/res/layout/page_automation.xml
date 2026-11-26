@@ -179,6 +179,51 @@
                 android:text="• 计时起点为最近一次恢复出厂设置的时间，手动重置后会自动重新计时。\n• 每次执行都会真实调用固件接口并清空随身 WiFi 配置，手机会断网。\n• 系统省电策略可能让任务延迟数分钟。\n• 执行结果会写入日志页。" />
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="后台保活设置" />
+
+            <TextView
+                style="@style/CardHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="3dp"
+                android:text="应用已常驻前台通知保持激活。若任务仍被系统清理，请开启自启动并将省电策略设为「无限制」。" />
+
+            <Button
+                android:id="@+id/btn_autostart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_button_ghost"
+                android:text="开启自启动"
+                android:textAllCaps="false"
+                android:textColor="@color/primary"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_battery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_button_ghost"
+                android:text="设置省电策略"
+                android:textAllCaps="false"
+                android:textColor="@color/primary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <Button
             android:id="@+id/btn_save"
             android:layout_width="match_parent"

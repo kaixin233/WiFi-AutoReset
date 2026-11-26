@@ -73,16 +73,15 @@ class DashboardPage(
             .setPositiveButton("确认执行") { _, _ ->
                 Toast.makeText(activity, "正在执行…", Toast.LENGTH_SHORT).show()
                 Utils.asyncUi(
-                    {
-                        val body = action()
-                        AppLog.append(
-                            activity,
-                            LogEntry(LogEntry.now(), title, "手动", "已发送", body.take(300)),
-                        )
-                    },
+                    { action() },
                     { error ->
-                        val text = if (error == null) "已执行" else "失败：${error.message}"
-                        Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
+                        if (error == null) {
+                            AppLog.append(activity, LogEntry(LogEntry.now(), title, "成功"))
+                            Toast.makeText(activity, "已执行", Toast.LENGTH_SHORT).show()
+                        } else {
+                            AppLog.append(activity, LogEntry(LogEntry.now(), title, "失败"))
+                            Toast.makeText(activity, "失败：${error.message}", Toast.LENGTH_LONG).show()
+                        }
                     },
                 )
             }
