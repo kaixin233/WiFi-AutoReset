@@ -13,6 +13,8 @@
     <!-- 前台守护服务：维持进程前台优先级，防止 MIUI 划卡清除闹钟。 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- 实时网速悬浮窗：仅用户开启时申请，未授权不会启动服务。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:label="@string/app_name"
@@ -57,6 +59,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="保持进程前台优先级以防止系统清除定时任务闹钟" />
+        </service>
+
+        <!-- 实时网速悬浮窗服务：前台通知 + 半透明小窗，双击窗口自动关闭。 -->
+        <service
+            android:name=".OverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="显示可拖动的实时网速悬浮窗" />
         </service>
     </application>
 </manifest>

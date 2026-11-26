@@ -5,24 +5,31 @@ import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.view.View
 import android.widget.Button
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 
-/** 仪表盘页面控制器（纯原生 View，无 Fragment）：实时网速 + 设备操作。 */
+/** 单页仪表盘：实时网速、悬浮窗、定时任务、设备操作、后台保活与执行日志。 */
 class DashboardPage(
     private val activity: Activity,
     override val view: View,
 ) : PageController {
 
     private var monitor: SpeedMonitor? = null
+    private var automation: AutomationController? = null
+    private var logs: LogSectionController? = null
+    private var pendingOverlayPermission = false
+    private var updatingOverlaySwitch = false
 
     init {
         monitor = SpeedMonitor { rx, tx ->
             activity.runOnUiThread {
                 view.find<TextView>(R.id.text_speed_down).text = Utils.formatSpeed(rx)
                 view.find<TextView>(R.id.text_speed_up).text = Utils.formatSpeed(tx)
+                syncOverlaySwitch()
             }
         }
 
@@ -36,10 +43,94 @@ class DashboardPage(
                 body
             }
         }
-        view.find<Button>(R.id.btn_reboot).setOnClickListener {
-            confirm("重启设备", "设备会短暂断网后重新上线，配置不会丢失。确认继续？") { MifiClient.reboot() }
-        }
         view.find<Button>(R.id.btn_open_web).setOnClickListener { openManagementPage() }
+
+        setupOverlaySwitch()
+        automation = AutomationController(activity, view)
+        logs = LogSectionController(activity, view)
+    }
+
+    override fun onShow() {
+        monitor?.start()
+        automation?.onShow()
+        logs?.onShow()
+        syncOverlaySwitch()
+    }
+
+    override fun onHide() {
+        monitor?.stop()
+        automation?.onHide()
+    }
+
+    override fun onResume() {
+        automation?.onResume()
+        logs?.onResume()
+        syncOverlaySwitch()
+        if (pendingOverlayPermission) {
+            pendingOverlayPermission = false
+            if (Settings.canDrawOverlays(activity)) {
+                setOverlaySwitch(true)
+                OverlayService.start(activity)
+                Toast.makeText(activity, "悬浮窗已开启", Toast.LENGTH_SHORT).show()
+            } else {
+                setOverlaySwitch(false)
+                Toast.makeText(activity, "未获得悬浮窗权限", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        onHide()
+        automation?.onDestroy()
+        automation = null
+        logs = null
+        monitor = null
+    }
+
+    private fun setupOverlaySwitch() {
+        val switch = view.find<Switch>(R.id.switch_overlay)
+        setOverlaySwitch(OverlayService.isEnabled(activity) && Settings.canDrawOverlays(activity))
+        switch.setOnCheckedChangeListener { _, checked ->
+            if (updatingOverlaySwitch) return@setOnCheckedChangeListener
+            if (!checked) {
+                OverlayService.stop(activity)
+                return@setOnCheckedChangeListener
+            }
+            if (Settings.canDrawOverlays(activity)) {
+                OverlayService.start(activity)
+            } else {
+                pendingOverlayPermission = true
+                Toast.makeText(activity, "请允许本应用显示悬浮窗", Toast.LENGTH_LONG).show()
+                try {
+                    activity.startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${activity.packageName}"),
+                        ),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    pendingOverlayPermission = false
+                    setOverlaySwitch(false)
+                    Toast.makeText(activity, "未找到悬浮窗设置页", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun syncOverlaySwitch() {
+        val enabled = OverlayService.isEnabled(activity)
+        val permitted = Settings.canDrawOverlays(activity)
+        // 用户在系统设置里撤销权限后，及时清理残留的前台服务与开关状态。
+        if (enabled && !permitted) OverlayService.stop(activity)
+        setOverlaySwitch(enabled && permitted)
+    }
+
+    private fun setOverlaySwitch(checked: Boolean) {
+        val switch = view.find<Switch>(R.id.switch_overlay)
+        if (switch.isChecked == checked) return
+        updatingOverlaySwitch = true
+        switch.isChecked = checked
+        updatingOverlaySwitch = false
     }
 
     /** 用系统浏览器打开随身 WiFi 管理页，不再在 App 内嵌 WebView。 */
@@ -50,19 +141,6 @@ class DashboardPage(
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(activity, "未找到可用浏览器", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    override fun onShow() {
-        monitor?.start()
-    }
-
-    override fun onHide() {
-        monitor?.stop()
-    }
-
-    override fun onDestroy() {
-        onHide()
-        monitor = null
     }
 
     private fun confirm(title: String, message: String, action: () -> String) {

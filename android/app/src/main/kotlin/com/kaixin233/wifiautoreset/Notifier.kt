@@ -24,6 +24,8 @@ object Notifier {
     private const val KEEPALIVE_CHANNEL_NAME = "后台守护"
     /** 前台服务通知 id 必须固定且区别于结果通知（1001）。 */
     const val KEEPALIVE_NOTIFICATION_ID = 1002
+    /** 悬浮窗服务通知 id，需与守护服务区分。 */
+    const val OVERLAY_NOTIFICATION_ID = 1003
 
     private fun manager(context: Context): NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -124,5 +126,31 @@ object Notifier {
                 manager(context).createNotificationChannel(channel)
             }
         }
+    }
+
+    /** 悬浮窗服务的前台通知：低优先级、静默，双击悬浮窗即可关闭服务。 */
+    fun overlayNotification(context: Context): Notification {
+        ensureKeepaliveChannel(context)
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pi = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, KEEPALIVE_CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+        }
+        return builder
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setContentTitle("实时网速悬浮窗")
+            .setContentText("双击悬浮窗即可关闭")
+            .setContentIntent(pi)
+            .setOngoing(true)
+            .setShowWhen(false)
+            .build()
     }
 }

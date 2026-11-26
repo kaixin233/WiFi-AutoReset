@@ -118,6 +118,4 @@ object MifiClient {
 
     /** 真·恢复出厂设置：固件中 lt_rm_btnResetFactory 对应的 json_device_restore_factory。 */
     fun factoryReset(): String = request("device_restore_factory")
-
-    fun reboot(): String = request("device_restart")
 }
