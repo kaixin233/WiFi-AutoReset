@@ -43,6 +43,19 @@
             </intent-filter>
         </receiver>
 
+        <!-- 智能限速调控：采样、复核、空闲检查与执行，均由系统闹钟触发。 -->
+        <receiver
+            android:name=".SmartReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.kaixin233.wifiautoreset.ACTION_SMART_SAMPLE" />
+                <action android:name="com.kaixin233.wifiautoreset.ACTION_SMART_VERIFY" />
+                <action android:name="com.kaixin233.wifiautoreset.ACTION_SMART_CHECK" />
+                <action android:name="com.kaixin233.wifiautoreset.ACTION_SMART_FINAL" />
+                <action android:name="com.kaixin233.wifiautoreset.ACTION_SMART_CANCEL" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="false">

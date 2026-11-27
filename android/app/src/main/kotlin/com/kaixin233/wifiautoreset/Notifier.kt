@@ -26,6 +26,8 @@ object Notifier {
     const val KEEPALIVE_NOTIFICATION_ID = 1002
     /** 悬浮窗服务通知 id，需与守护服务区分。 */
     const val OVERLAY_NOTIFICATION_ID = 1003
+    /** 智能限速过程的低优先级提示，避免打断用户。 */
+    private const val SMART_NOTIFICATION_ID = 1004
 
     private fun manager(context: Context): NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -79,6 +81,61 @@ object Notifier {
             .setShowWhen(true)
             .build()
         manager(context).notify(1001, notification)
+    }
+
+    /** 智能限速的低优先级提示：静默、不震动，仅出现在通知栏。 */
+    fun notifyLow(context: Context, title: String, text: String) {
+        ensureKeepaliveChannel(context)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, KEEPALIVE_CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+        }
+        manager(context).notify(
+            SMART_NOTIFICATION_ID,
+            builder
+                .setSmallIcon(R.drawable.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(Notification.BigTextStyle().bigText(text))
+                .setAutoCancel(true)
+                .setShowWhen(false)
+                .build(),
+        )
+    }
+
+    /** 执行前 10 秒的可撤销通知：取消 / 立即重置。 */
+    fun smartPending(context: Context) {
+        ensureKeepaliveChannel(context)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val cancel = PendingIntent.getBroadcast(
+            context, 2201,
+            Intent(context, SmartReceiver::class.java).setAction(SmartScheduler.ACTION_CANCEL),
+            flags,
+        )
+        val now = PendingIntent.getBroadcast(
+            context, 2202,
+            Intent(context, SmartReceiver::class.java).setAction(SmartScheduler.ACTION_FINAL),
+            flags,
+        )
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, KEEPALIVE_CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context)
+        }
+        val notification = builder
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setContentTitle("10 秒后自动重置")
+            .setContentText("检测到限速且当前空闲，点击可取消")
+            .setContentIntent(cancel)
+            .setAutoCancel(true)
+            .setShowWhen(false)
+            .addAction(Notification.Action.Builder(R.drawable.ic_launcher, "取消", cancel).build())
+            .addAction(Notification.Action.Builder(R.drawable.ic_launcher, "立即重置", now).build())
+            .build()
+        manager(context).notify(SMART_NOTIFICATION_ID, notification)
     }
 
     /**

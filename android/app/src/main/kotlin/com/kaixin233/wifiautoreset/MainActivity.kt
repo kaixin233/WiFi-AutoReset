@@ -30,8 +30,11 @@ class MainActivity : Activity() {
         page = DashboardPage(this, pageView).also { holder.addView(it.view) }
 
         requestNotificationPermissionIfNeeded()
-        // 若定时任务已启用但守护服务未运行（如被系统清理后重新进入），补拉一次。
-        if (AlarmScheduler.isEnabled(this)) KeepAliveService.start(this)
+        // 若任一自动任务已启用但守护服务未运行（如被系统清理后重新进入），补拉一次。
+        if (AlarmScheduler.isEnabled(this) || SmartScheduler.isEnabled(this)) {
+            KeepAliveService.start(this)
+        }
+        if (SmartScheduler.isEnabled(this)) SmartScheduler.scheduleSample(this)
     }
 
     override fun onResume() {

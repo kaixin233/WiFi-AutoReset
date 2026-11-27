@@ -62,6 +62,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
         // 成功后刷新计时基准：下次执行 = 本次重置时间 + 一个周期。
         AlarmScheduler.markReset(app)
+        SmartScheduler.noteExternalReset(app)
         Notifier.notify(app, "定时重置已执行", "随身 WiFi 已恢复出厂设置，设备即将重启断网")
 
         AlarmScheduler.schedule(app)

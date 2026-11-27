@@ -16,8 +16,8 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * 仪表盘内的定时任务区块：周期、开关、倒计时与后台保活入口。
- * 逻辑沿用 AlarmManager 调度；UI 已合并进仪表盘，不再有独立页面。
+ * 仪表盘内的自动恢复区块：固定周期模式与智能限速模式二选一。
+ * 智能模式只在确认云控限速且用户空闲时执行重置，尽量不打断体验。
  */
 class AutomationController(
     private val activity: Activity,
@@ -27,6 +27,7 @@ class AutomationController(
     private var enabled = false
     private var interval = AlarmScheduler.DEFAULT_INTERVAL_MINUTES
     private var active = false
+    private var modeSmart = false
     private var pendingAutoStart = false
 
     private val presets = mapOf(
@@ -46,7 +47,8 @@ class AutomationController(
 
     init {
         val prefs = AlarmScheduler.prefs(activity)
-        enabled = prefs.getBoolean(AlarmScheduler.KEY_ENABLED, false)
+        modeSmart = SmartScheduler.isSmartMode(activity)
+        enabled = if (modeSmart) SmartScheduler.isEnabled(activity) else AlarmScheduler.isEnabled(activity)
         interval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
             .coerceIn(AlarmScheduler.MIN_INTERVAL_MINUTES, AlarmScheduler.MAX_INTERVAL_MINUTES)
 
@@ -57,6 +59,9 @@ class AutomationController(
             updateStatus()
             updateCountdown()
         }
+
+        view.find<RadioButton>(R.id.radio_fixed).setOnClickListener { switchMode(false) }
+        view.find<RadioButton>(R.id.radio_smart).setOnClickListener { switchMode(true) }
 
         presets.forEach { (id, minutes) ->
             view.find<RadioButton>(id).setOnClickListener {
@@ -73,7 +78,9 @@ class AutomationController(
         view.find<Button>(R.id.btn_battery).setOnClickListener { confirmBattery() }
 
         selectPreset(interval)
+        applyModeVisibility()
         updateStatus()
+        updateCountdown()
         refreshKeepAlive()
     }
 
@@ -104,6 +111,23 @@ class AutomationController(
     }
 
     fun onDestroy() = onHide()
+
+    private fun switchMode(smart: Boolean) {
+        if (modeSmart == smart) return
+        modeSmart = smart
+        enabled = if (smart) SmartScheduler.isEnabled(activity) else AlarmScheduler.isEnabled(activity)
+        view.find<Switch>(R.id.switch_enabled).isChecked = enabled
+        applyModeVisibility()
+        updateStatus()
+        updateCountdown()
+    }
+
+    private fun applyModeVisibility() {
+        view.find<RadioButton>(R.id.radio_fixed).isChecked = !modeSmart
+        view.find<RadioButton>(R.id.radio_smart).isChecked = modeSmart
+        view.find<View>(R.id.fixed_controls).visibility = if (modeSmart) View.GONE else View.VISIBLE
+        view.find<View>(R.id.text_smart_status).visibility = if (modeSmart) View.VISIBLE else View.GONE
+    }
 
     private fun selectPreset(minutes: Int) {
         val isPreset = presets.values.contains(minutes)
@@ -145,14 +169,49 @@ class AutomationController(
     }
 
     private fun save() {
+        if (modeSmart) saveSmart() else saveFixed()
+        updateStatus()
+        updateCountdown()
+    }
+
+    private fun saveSmart() {
+        val prefs = AlarmScheduler.prefs(activity)
+        val wasEnabled = SmartScheduler.isEnabled(activity)
+        prefs.edit()
+            .putString(SmartScheduler.KEY_MODE, "smart")
+            .putBoolean(SmartScheduler.KEY_SMART_ENABLED, enabled)
+            .putBoolean(AlarmScheduler.KEY_ENABLED, false)
+            .apply()
+        AlarmScheduler.cancel(activity)
+        SmartScheduler.cancelAll(activity)
+
+        if (enabled) {
+            if (!wasEnabled) SmartScheduler.resetState(activity)
+            SmartScheduler.scheduleSample(activity, 5_000L)
+            KeepAliveService.start(activity)
+            AppLog.append(activity, LogEntry(LogEntry.now(), "智能限速已开启", "成功"))
+            Toast.makeText(activity, "已开启：限速且空闲时自动重置", Toast.LENGTH_SHORT).show()
+        } else {
+            SmartScheduler.resetState(activity)
+            KeepAliveService.stop(activity)
+            AppLog.append(activity, LogEntry(LogEntry.now(), "智能限速已关闭", "成功"))
+            Toast.makeText(activity, "智能限速已关闭", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveFixed() {
         val prefs = AlarmScheduler.prefs(activity)
         val wasEnabled = prefs.getBoolean(AlarmScheduler.KEY_ENABLED, false)
         val oldInterval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
 
         prefs.edit()
+            .putString(SmartScheduler.KEY_MODE, "fixed")
             .putBoolean(AlarmScheduler.KEY_ENABLED, enabled)
+            .putBoolean(SmartScheduler.KEY_SMART_ENABLED, false)
             .putInt(AlarmScheduler.KEY_INTERVAL_MINUTES, interval)
             .apply()
+        SmartScheduler.cancelAll(activity)
+        SmartScheduler.resetState(activity)
 
         if (enabled) {
             val base = AlarmScheduler.lastResetAt(activity)
@@ -172,15 +231,20 @@ class AutomationController(
             AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务已关闭", "成功"))
             Toast.makeText(activity, "定时任务已关闭", Toast.LENGTH_SHORT).show()
         }
-        updateCountdown()
     }
 
     private fun updateStatus() {
-        view.find<TextView>(R.id.text_schedule_status).text =
+        val status = view.find<TextView>(R.id.text_schedule_status)
+        status.text = if (modeSmart) {
+            "智能限速 · ${if (enabled) "监测中" else "已关闭"}"
+        } else {
             "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"}"
+        }
     }
 
     private fun updateCountdown() {
+        view.find<TextView>(R.id.text_smart_status).text = SmartScheduler.statusText(activity)
+        if (modeSmart) return
         val countdown = view.find<TextView>(R.id.text_countdown)
         val absolute = view.find<TextView>(R.id.text_next_absolute)
         if (!enabled) {

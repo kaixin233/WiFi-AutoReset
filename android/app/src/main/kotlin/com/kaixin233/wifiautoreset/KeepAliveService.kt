@@ -33,7 +33,9 @@ class KeepAliveService : Service() {
             startForeground(Notifier.KEEPALIVE_NOTIFICATION_ID, Notifier.keepaliveNotification(this))
         }
         // 服务被系统重建时补一次排程兜底：若闹钟被清除可立即恢复（已启用才会排）。
-        AlarmScheduler.schedule(applicationContext)
+        val app = applicationContext
+        if (AlarmScheduler.isEnabled(app)) AlarmScheduler.schedule(app)
+        if (SmartScheduler.isEnabled(app)) SmartScheduler.scheduleSample(app)
         // 被系统回收后尽可能重建；配合 AlarmManager 双保险。
         return START_STICKY
     }

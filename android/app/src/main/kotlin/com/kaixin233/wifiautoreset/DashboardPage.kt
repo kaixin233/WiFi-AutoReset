@@ -39,6 +39,7 @@ class DashboardPage(
                 // 手动重置成功后刷新计时基准并重新排程：倒计时从这一刻重新开始。
                 val app = activity.applicationContext
                 AlarmScheduler.markReset(app)
+                SmartScheduler.noteExternalReset(app)
                 if (AlarmScheduler.isEnabled(app)) AlarmScheduler.schedule(app)
                 body
             }
