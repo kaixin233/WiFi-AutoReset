@@ -15,7 +15,11 @@ import java.util.Locale
  * 智能策略调控：以「上下行之和 < 500 KB/s」判定云控限速，
  * 并只在用户空闲时执行恢复出厂，尽量不打断使用。
  *
- * 采样用非精确闹钟 + 内核计数器差值，无网络请求、无常驻轮询线程。
+ * 两道安全闸门：
+ * 1. 仅在 MiFi-281F（固件指纹 realm=Highwmg）下检测与重置，其它 WiFi 完全不介入；
+ * 2. 重置后 30 分钟保护期 + 成效核验，连续无效则指数退避，避免频繁无效重置。
+ *
+ * 采样用非精确闹钟 + 内核计数器差值，无轮询线程；设备指纹探测带缓存。
  */
 object SmartScheduler {
     const val ACTION_SAMPLE = "com.kaixin233.wifiautoreset.ACTION_SMART_SAMPLE"
@@ -37,9 +41,17 @@ object SmartScheduler {
     const val VERIFY_DELAY_MS = 30_000L
     const val CHECK_INTERVAL_MS = 30_000L
     const val USER_DELAY_MS = 10_000L
-    const val COOLDOWN_MS = 10 * 60_000L
+    /** 重置后保护期：这段时间内必定正常网速，既不检测也不重置。 */
+    const val PROTECT_MS = 30 * 60_000L
+    /** 基础冷却 = 保护期；核验失败后按 2 的幂延长，上限 12 小时。 */
+    const val BASE_COOLDOWN_MS = PROTECT_MS
+    const val MAX_COOLDOWN_MS = 12 * 60 * 60_000L
+    const val MAX_INVALID_STREAK = 5
     const val MAX_WAIT_MS = 15 * 60_000L
     const val DAILY_LIMIT = 3
+    /** 设备指纹缓存：命中时 15 分钟；未命中时 2 分钟，便于设备重启后快速恢复。 */
+    const val TARGET_TTL_MS = 15 * 60_000L
+    const val TARGET_FAIL_TTL_MS = 2 * 60_000L
 
     private const val REQ_SAMPLE = 2101
     private const val REQ_VERIFY = 2102
@@ -59,6 +71,11 @@ object SmartScheduler {
     const val KEY_DAILY_DAY = "smart_daily_day"
     const val KEY_PENDING_RESET = "smart_pending_reset"
     const val KEY_LAST_SMART_RESET = "smart_last_reset_at"
+    const val KEY_INVALID_STREAK = "smart_invalid_streak"
+    const val KEY_PROTECT_UNTIL = "smart_protect_until"
+    const val KEY_VERIFY_PENDING = "smart_verify_pending"
+    const val KEY_TARGET_OK = "smart_target_ok"
+    const val KEY_TARGET_AT = "smart_target_at"
 
     fun prefs(context: Context) = AlarmScheduler.prefs(context)
 
@@ -83,6 +100,37 @@ object SmartScheduler {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+    }
+
+    /**
+     * 是否连在目标设备 MiFi-281F 上：WiFi + 固件指纹匹配。
+     * 指纹结果带缓存；探测失败只缓存 2 分钟，避免设备重启后长时间误判为"非目标"。
+     */
+    fun isTargetNetwork(context: Context): Boolean {
+        if (!isWifi(context)) return false
+        val prefs = prefs(context)
+        val now = System.currentTimeMillis()
+        val at = prefs.getLong(KEY_TARGET_AT, 0L)
+        val ok = prefs.getBoolean(KEY_TARGET_OK, false)
+        val ttl = if (ok) TARGET_TTL_MS else TARGET_FAIL_TTL_MS
+        if (at > 0L && now - at < ttl) return ok
+        val fresh = MifiClient.isTargetDevice()
+        prefs.edit()
+            .putBoolean(KEY_TARGET_OK, fresh)
+            .putLong(KEY_TARGET_AT, now)
+            .apply()
+        return fresh
+    }
+
+    /** UI 展示用：只读缓存，绝不发网络请求（状态每秒刷新）。 */
+    fun isTargetCached(context: Context): Boolean {
+        if (!isWifi(context)) return false
+        val prefs = prefs(context)
+        val at = prefs.getLong(KEY_TARGET_AT, 0L)
+        if (at <= 0L) return true
+        val ok = prefs.getBoolean(KEY_TARGET_OK, false)
+        val ttl = if (ok) TARGET_TTL_MS else TARGET_FAIL_TTL_MS
+        return if (System.currentTimeMillis() - at < ttl) ok else true
     }
 
     /** 总收发字节；设备不支持时返回 -1。 */
@@ -143,23 +191,40 @@ object SmartScheduler {
             .putLong(KEY_CHECK_TOTAL, -1L)
             .putLong(KEY_CHECK_AT, 0L)
             .putBoolean(KEY_PENDING_RESET, false)
+            .putInt(KEY_INVALID_STREAK, 0)
+            .putLong(KEY_PROTECT_UNTIL, 0L)
+            .putBoolean(KEY_VERIFY_PENDING, false)
             .apply()
     }
 
     fun suspectSince(context: Context): Long =
         prefs(context).getLong(KEY_SUSPECT_SINCE, 0L)
 
-    /** 冷却中或今日已达上限时，不允许执行自动重置。 */
+    fun invalidStreak(context: Context): Int =
+        prefs(context).getInt(KEY_INVALID_STREAK, 0)
+
+    fun protectUntil(context: Context): Long =
+        prefs(context).getLong(KEY_PROTECT_UNTIL, 0L)
+
+    /** 连续核验失败越多，下次允许重置的间隔越长（30 分 → 1 时 → 2 时 … 上限 12 时）。 */
+    fun cooldownMs(context: Context): Long {
+        val streak = invalidStreak(context).coerceIn(0, MAX_INVALID_STREAK)
+        return (BASE_COOLDOWN_MS shl streak).coerceAtMost(MAX_COOLDOWN_MS)
+    }
+
+    /** 保护期内、冷却中或今日已达上限时，不允许执行自动重置。 */
     fun canReset(context: Context): Boolean {
         val prefs = prefs(context)
+        val now = System.currentTimeMillis()
+        if (now < prefs.getLong(KEY_PROTECT_UNTIL, 0L)) return false
         val last = prefs.getLong(KEY_LAST_SMART_RESET, 0L)
-        if (System.currentTimeMillis() - last < COOLDOWN_MS) return false
+        if (now - last < cooldownMs(context)) return false
         val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
         if (prefs.getString(KEY_DAILY_DAY, "") != today) return true
         return prefs.getInt(KEY_DAILY_COUNT, 0) < DAILY_LIMIT
     }
 
-    /** 记录一次实际执行，刷新冷却与每日计数，并建立新的采样基准。 */
+    /** 记录一次智能重置：进入保护期，并安排在保护期末做成效核验。 */
     fun noteReset(context: Context) {
         val prefs = prefs(context)
         val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
@@ -173,14 +238,16 @@ object SmartScheduler {
             .putInt(KEY_LOW_STREAK, 0)
             .putLong(KEY_SUSPECT_SINCE, 0L)
             .putBoolean(KEY_PENDING_RESET, false)
+            .putLong(KEY_PROTECT_UNTIL, now + PROTECT_MS)
+            .putBoolean(KEY_VERIFY_PENDING, true)
             .putLong(KEY_LAST_TOTAL, totalBytes())
             .putLong(KEY_LAST_AT, now)
             .apply()
         AlarmScheduler.markReset(context, now)
-        scheduleSample(context)
+        scheduleSample(context, PROTECT_MS)
     }
 
-    /** 手动重置或固定周期重置后也要刷新智能模式的冷却与采样基准。 */
+    /** 手动重置或固定周期重置后：刷新保护期与计数，并从新的起点开始核验。 */
     fun noteExternalReset(context: Context) {
         val now = System.currentTimeMillis()
         prefs(context).edit()
@@ -188,25 +255,54 @@ object SmartScheduler {
             .putInt(KEY_LOW_STREAK, 0)
             .putLong(KEY_SUSPECT_SINCE, 0L)
             .putBoolean(KEY_PENDING_RESET, false)
+            .putInt(KEY_INVALID_STREAK, 0)
+            .putLong(KEY_PROTECT_UNTIL, now + PROTECT_MS)
+            .putBoolean(KEY_VERIFY_PENDING, true)
             .putLong(KEY_LAST_TOTAL, totalBytes())
             .putLong(KEY_LAST_AT, now)
             .apply()
-        if (isEnabled(context)) scheduleSample(context)
+        if (isEnabled(context)) scheduleSample(context, PROTECT_MS)
+    }
+
+    /** 核验成功：网速已恢复，退避计数归零。 */
+    fun markVerified(context: Context) {
+        prefs(context).edit()
+            .putInt(KEY_INVALID_STREAK, 0)
+            .putBoolean(KEY_VERIFY_PENDING, false)
+            .apply()
+    }
+
+    /** 核验失败：网速仍低，累加退避计数并返回当前冷却分钟数。 */
+    fun markUnrecovered(context: Context): Int {
+        val prefs = prefs(context)
+        val streak = (prefs.getInt(KEY_INVALID_STREAK, 0) + 1).coerceAtMost(MAX_INVALID_STREAK)
+        prefs.edit()
+            .putInt(KEY_INVALID_STREAK, streak)
+            .putBoolean(KEY_VERIFY_PENDING, false)
+            .apply()
+        return (cooldownMs(context) / 60_000L).toInt()
     }
 
     /** 仪表盘展示用状态。 */
     fun statusText(context: Context): String {
         if (!isEnabled(context)) return "智能策略 · 未启用"
+        if (!isTargetCached(context)) return "非目标 WiFi · 未监测"
         val prefs = prefs(context)
+        val now = System.currentTimeMillis()
+        val protect = prefs.getLong(KEY_PROTECT_UNTIL, 0L)
+        if (protect > 0L && now < protect) {
+            return "保护期 · 剩余 ${(protect - now) / 60_000L + 1} 分钟"
+        }
         val last = prefs.getLong(KEY_LAST_SMART_RESET, 0L)
-        val remaining = COOLDOWN_MS - (System.currentTimeMillis() - last)
+        val remaining = cooldownMs(context) - (now - last)
         if (last > 0L && remaining > 0L) {
-            return "冷却中 · 剩余 ${remaining / 60_000 + 1} 分钟"
+            val extra = if (invalidStreak(context) > 0) "（重置未恢复，已延长）" else ""
+            return "冷却中 · 剩余 ${remaining / 60_000L + 1} 分钟$extra"
         }
         val suspect = suspectSince(context)
         if (suspect > 0L) {
-            val waited = System.currentTimeMillis() - suspect
-            return "疑似限速 · 等待空闲 ${waited / 60_000 + 1} 分钟"
+            val waited = now - suspect
+            return "疑似限速 · 等待空闲 ${waited / 60_000L + 1} 分钟"
         }
         return "正常 · 正在监测"
     }

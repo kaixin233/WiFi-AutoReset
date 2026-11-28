@@ -10,6 +10,7 @@ import android.os.PowerManager
  *
  * 采样 → 连续 2 次低速 → 30 秒复核 → 等待空闲 → 执行重置，
  * 每一步都由系统闹钟驱动，持有短暂 WakeLock 保证后台执行完成。
+ * 只在目标设备 MiFi-281F 上工作；重置后先过保护期再核验成效。
  */
 class SmartReceiver : BroadcastReceiver() {
 
@@ -62,12 +63,12 @@ class SmartReceiver : BroadcastReceiver() {
         )
     }
 
-    /** 每 2 分钟：累计流量差值 → 平均速率。 */
+    /** 每 2 分钟：累计流量差值 → 平均速率。熄屏与保护期不做限速判定。 */
     private fun sample(app: Context) {
         if (!SmartScheduler.isEnabled(app)) return
         // 先排下一次，保证任何分支返回后闹钟链都不断。
         SmartScheduler.scheduleSample(app)
-        if (!SmartScheduler.isWifi(app)) return
+        if (!SmartScheduler.isTargetNetwork(app)) return
 
         val total = SmartScheduler.totalBytes()
         if (total < 0) return
@@ -94,6 +95,27 @@ class SmartReceiver : BroadcastReceiver() {
             .putLong(SmartScheduler.KEY_LAST_TOTAL, total)
             .apply()
 
+        // 保护期末的成效核验：确认重置是否真的恢复了网速。
+        if (now >= SmartScheduler.protectUntil(app) &&
+            prefs.getBoolean(SmartScheduler.KEY_VERIFY_PENDING, false)
+        ) {
+            verifyRecovery(app, bytes, avg)
+            return
+        }
+
+        // 保护期内不做任何限速判定，也不累积低速计数。
+        if (now < SmartScheduler.protectUntil(app)) {
+            prefs.edit().putInt(SmartScheduler.KEY_LOW_STREAK, 0).apply()
+            return
+        }
+
+        // 熄屏后系统可能限制后台网络请求，速率天然偏低，不能作为云控判据。
+        val power = app.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (power?.isInteractive == false) {
+            prefs.edit().putInt(SmartScheduler.KEY_LOW_STREAK, 0).apply()
+            return
+        }
+
         val valid = bytes >= SmartScheduler.VALID_WINDOW_BYTES
         val low = avg < SmartScheduler.LOW_BYTES_PER_SEC
         if (valid && low) {
@@ -111,9 +133,37 @@ class SmartReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * 重置成效核验：
+     * - 窗口流量不足（用户没在上网）→ 无法判断，保留待核验，下个窗口再看；
+     * - 速率已恢复 → 退避归零；
+     * - 仍然低速 → 累加退避，延长下次重置间隔，避免频繁无效重置。
+     */
+    private fun verifyRecovery(app: Context, bytes: Long, avg: Double) {
+        if (bytes < SmartScheduler.VALID_WINDOW_BYTES) {
+            SmartScheduler.scheduleSample(app)
+            return
+        }
+        if (avg >= SmartScheduler.RECOVER_BYTES_PER_SEC) {
+            SmartScheduler.markVerified(app)
+            Notifier.notifyLow(app, "重置已生效", "网速已恢复，智能策略继续监测")
+            return
+        }
+        if (avg < SmartScheduler.LOW_BYTES_PER_SEC) {
+            val minutes = SmartScheduler.markUnrecovered(app)
+            AppLog.append(app, LogEntry(LogEntry.now(), "重置核验", "未恢复"))
+            Notifier.notifyLow(app, "重置后网速未恢复", "已暂停自动重置，下次最早在 $minutes 分钟后重试")
+            return
+        }
+        // 介于限速与恢复之间：无法定性，归零退避继续常规监测。
+        SmartScheduler.markVerified(app)
+    }
+
     /** 30 秒短窗复核：确认峰值也没有超过 500 KB/s。 */
     private fun verify(app: Context) {
-        if (!SmartScheduler.isEnabled(app) || !SmartScheduler.isWifi(app)) return
+        if (!SmartScheduler.isEnabled(app) || !SmartScheduler.isTargetNetwork(app)) return
+        val power = app.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (power?.isInteractive == false) return
         val total = SmartScheduler.totalBytes()
         if (total < 0) return
         val prefs = SmartScheduler.prefs(app)
@@ -140,6 +190,7 @@ class SmartReceiver : BroadcastReceiver() {
     private fun checkIdle(app: Context) {
         if (!SmartScheduler.isEnabled(app)) return
         SmartScheduler.scheduleCheck(app)
+        if (!SmartScheduler.isTargetNetwork(app)) return
         if (SmartScheduler.suspectSince(app) == 0L) return
         val prefs = SmartScheduler.prefs(app)
         if (prefs.getBoolean(SmartScheduler.KEY_PENDING_RESET, false)) return
@@ -170,9 +221,10 @@ class SmartReceiver : BroadcastReceiver() {
             .putLong(SmartScheduler.KEY_CHECK_TOTAL, total)
             .apply()
 
-        if (!screenOn || idleByTraffic) {
+        // 熄屏也要满足低流量：避免后台有下载/上传时被拦腰重置。
+        if (idleByTraffic) {
             if (screenOn) {
-                // 屏幕亮着但已空闲：给 10 秒反悔窗口。
+                // 屏幕亮着且已空闲：给 10 秒反悔窗口。
                 prefs.edit().putBoolean(SmartScheduler.KEY_PENDING_RESET, true).apply()
                 Notifier.smartPending(app)
                 SmartScheduler.scheduleFinal(app)
@@ -195,13 +247,18 @@ class SmartReceiver : BroadcastReceiver() {
             .apply()
     }
 
-    /** 执行真实恢复出厂，并刷新冷却与每日计数。 */
+    /** 执行真实恢复出厂，并刷新保护期、冷却与每日计数。 */
     private fun doReset(app: Context) {
+        // 执行前最后一道闸门：目标设备校验（判定到执行期间可能已切换 WiFi）。
+        if (!SmartScheduler.isTargetNetwork(app)) {
+            clearSuspect(app)
+            return
+        }
         try {
             MifiClient.factoryReset()
             AppLog.append(app, LogEntry(LogEntry.now(), "智能重置", "成功"))
             SmartScheduler.noteReset(app)
-            Notifier.notify(app, "智能重置已执行", "检测到云控限速，随身 WiFi 已恢复出厂，即将重启断网")
+            Notifier.notify(app, "智能重置已执行", "云控限速已触发恢复出厂，30 分钟内将核验网速是否恢复")
         } catch (e: Exception) {
             AppLog.append(app, LogEntry(LogEntry.now(), "智能重置", "失败"))
             SmartScheduler.prefs(app).edit()

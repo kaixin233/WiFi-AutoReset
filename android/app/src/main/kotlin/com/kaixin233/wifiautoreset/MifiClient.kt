@@ -118,4 +118,24 @@ object MifiClient {
 
     /** 真·恢复出厂设置：固件中 lt_rm_btnResetFactory 对应的 json_device_restore_factory。 */
     fun factoryReset(): String = request("device_restore_factory")
+
+    /**
+     * 目标设备指纹：MiFi-281F 固件对 login.cgi 返回 realm="Highwmg" 的 Digest challenge。
+     * 用短超时探测，连到别的 WiFi（或设备重启中）时返回 false，全程不需要定位权限。
+     */
+    fun isTargetDevice(): Boolean {
+        val conn = URL("$BASE/login.cgi").openConnection() as HttpURLConnection
+        conn.requestMethod = "GET"
+        conn.connectTimeout = 1500
+        conn.readTimeout = 1500
+        conn.instanceFollowRedirects = false
+        return try {
+            conn.getHeaderField("WWW-Authenticate").orEmpty()
+                .contains("Highwmg", ignoreCase = true)
+        } catch (_: Exception) {
+            false
+        } finally {
+            conn.disconnect()
+        }
+    }
 }
