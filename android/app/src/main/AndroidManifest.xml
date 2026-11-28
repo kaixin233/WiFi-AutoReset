@@ -74,10 +74,12 @@
                 android:value="保持进程前台优先级以防止系统清除定时任务闹钟" />
         </service>
 
-        <!-- 实时网速悬浮窗服务：前台通知 + 半透明小窗，双击窗口自动关闭。 -->
+        <!-- 实时网速悬浮窗服务：前台通知 + 半透明小窗，双击窗口自动关闭。
+             configChanges 让服务不随横竖屏重建，由 onConfigurationChanged 自行校正窗口位置。 -->
         <service
             android:name=".OverlayService"
             android:exported="false"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|locale|layoutDirection|fontScale|uiMode"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"

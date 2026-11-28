@@ -3,6 +3,7 @@ package com.kaixin233.wifiautoreset
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -21,6 +22,7 @@ import kotlin.math.abs
  *
  * - 权限：SYSTEM_ALERT_WINDOW，未授权时不会启动。
  * - 交互：可拖动（含顶部状态栏区域）；双击悬浮窗自动关闭并清除开关状态。
+ * - 旋转：Manifest 声明 configChanges，服务不随横竖屏重建；配置变化时把窗口重新钳制回可见区域。
  * - 恢复：服务被系统回收后，重新进入应用会自动补拉，避免开关与显示状态不一致。
  * - 省电：仅每秒采样一次 TrafficStats，无网络请求、无常驻轮询线程。
  */
@@ -31,6 +33,16 @@ class OverlayService : Service() {
     private var monitor: SpeedMonitor? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        // 兜底：少数 ROM 在横竖屏切换时仍会重建服务，此时 onStartCommand 不会再次调用。
+        // 只要开关仍开且权限仍在，就直接恢复窗口，避免“开关显示已开但窗口消失”。
+        if (isEnabled(this) && Settings.canDrawOverlays(this)) {
+            startForegroundNotification()
+            showOverlay()
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -47,6 +59,13 @@ class OverlayService : Service() {
         showOverlay()
         // 用户显式开启的悬浮窗：系统回收后由 onTaskRemoved / 再次进入应用补拉。
         return START_STICKY
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 横竖屏切换后屏幕尺寸变化，竖屏时记忆的坐标可能落到屏幕外；
+        // 重新钳制并刷新位置，避免窗口“消失”。
+        repositionOverlay()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -80,13 +99,8 @@ class OverlayService : Service() {
         val down = view.find<TextView>(R.id.overlay_down)
         val up = view.find<TextView>(R.id.overlay_up)
 
-        val density = resources.displayMetrics.density
-        val edge = (12 * density).toInt()
-        val statusBarHeight = resources
-            .getIdentifier("status_bar_height", "dimen", "android")
-            .takeIf { it > 0 }
-            ?.let { resources.getDimensionPixelSize(it) }
-            ?: 0
+        val edge = edgePx()
+        val statusBarHeight = statusBarHeightPx()
         val prefs = AlarmScheduler.prefs(this)
 
         val lp = WindowManager.LayoutParams(
@@ -129,13 +143,10 @@ class OverlayService : Service() {
                         val dx = (event.rawX - anchorX).toInt()
                         val dy = (event.rawY - anchorY).toInt()
                         if (abs(dx) > 6 || abs(dy) > 6) moved = true
-                        // 允许进入顶部状态栏区域，但不允许整窗滑出屏幕。
-                        val minX = -touched.width + edge
-                        val maxX = resources.displayMetrics.widthPixels - edge
-                        val minY = -statusBarHeight
-                        val maxY = resources.displayMetrics.heightPixels - edge
-                        lp.x = (baseX + dx).coerceIn(minX, maxX)
-                        lp.y = (baseY + dy).coerceIn(minY, maxY)
+                        lp.x = baseX + dx
+                        lp.y = baseY + dy
+                        // 边界实时计算，横竖屏切换后不沿用旧的屏幕尺寸。
+                        clampToScreen(lp, touched.width, edgePx(), statusBarHeightPx())
                         wm.updateViewLayout(touched, lp)
                         true
                     }
@@ -175,6 +186,14 @@ class OverlayService : Service() {
             return
         }
         viewAttached = true
+        // 窗口挂载后 view.width 才有效；位置可能来自上一次不同屏幕方向，先钳制回当前可见范围。
+        if (clampToScreen(lp, view.width, edgePx(), statusBarHeightPx())) {
+            try {
+                wm.updateViewLayout(view, lp)
+            } catch (_: Exception) {
+                // 忽略：下一次拖动或配置变化会再次校正。
+            }
+        }
 
         monitor = SpeedMonitor { rx, tx ->
             down.text = "↓ ${Utils.formatSpeedFixed(rx)}"
@@ -182,6 +201,54 @@ class OverlayService : Service() {
         }
         monitor?.start()
     }
+
+    /** 配置变化（横竖屏切换）时调用：把窗口重新钳制进当前屏幕。 */
+    private fun repositionOverlay() {
+        val view = overlayView ?: return
+        val wm = windowManager ?: return
+        val lp = view.layoutParams as? WindowManager.LayoutParams ?: return
+        val oldX = lp.x
+        val oldY = lp.y
+        if (!clampToScreen(lp, view.width, edgePx(), statusBarHeightPx())) return
+        if (lp.x == oldX && lp.y == oldY) return
+        try {
+            wm.updateViewLayout(view, lp)
+        } catch (_: Exception) {
+            return
+        }
+        // 保存校正后的坐标，避免下次仍从屏幕外的旧位置恢复。
+        AlarmScheduler.prefs(this).edit()
+            .putInt(PREF_X, lp.x)
+            .putInt(PREF_Y, lp.y)
+            .apply()
+    }
+
+    /** 把窗口坐标钳制进当前屏幕可见范围；返回坐标是否发生变化。 */
+    private fun clampToScreen(
+        lp: WindowManager.LayoutParams,
+        viewWidth: Int,
+        edge: Int,
+        statusBarHeight: Int,
+    ): Boolean {
+        val minX = -viewWidth + edge
+        val maxX = (resources.displayMetrics.widthPixels - edge).coerceAtLeast(minX)
+        val minY = -statusBarHeight
+        val maxY = (resources.displayMetrics.heightPixels - edge).coerceAtLeast(minY)
+        val nx = lp.x.coerceIn(minX, maxX)
+        val ny = lp.y.coerceIn(minY, maxY)
+        val changed = nx != lp.x || ny != lp.y
+        lp.x = nx
+        lp.y = ny
+        return changed
+    }
+
+    private fun edgePx(): Int = (12 * resources.displayMetrics.density).toInt()
+
+    private fun statusBarHeightPx(): Int =
+        resources.getIdentifier("status_bar_height", "dimen", "android")
+            .takeIf { it > 0 }
+            ?.let { resources.getDimensionPixelSize(it) }
+            ?: 0
 
     override fun onDestroy() {
         viewAttached = false

@@ -11,8 +11,8 @@ android {
         applicationId = "com.kaixin233.wifiautoreset"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20
-        versionName = "2.9.1"
+        versionCode = 21
+        versionName = "2.9.2"
         // 只保留中文资源，进一步减小 resources.arsc。
         resourceConfigurations += listOf("zh-rCN")
     }
