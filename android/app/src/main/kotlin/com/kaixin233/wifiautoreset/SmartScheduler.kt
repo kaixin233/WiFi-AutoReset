@@ -60,7 +60,6 @@ object SmartScheduler {
     private const val REQ_CANCEL = 2105
 
     const val KEY_SMART_ENABLED = "smart_enabled"
-    const val KEY_MODE = "automation_mode"
     const val KEY_LAST_TOTAL = "smart_last_total"
     const val KEY_LAST_AT = "smart_last_at"
     const val KEY_LOW_STREAK = "smart_low_streak"
@@ -84,13 +83,6 @@ object SmartScheduler {
 
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_SMART_ENABLED, enabled).apply()
-    }
-
-    fun isSmartMode(context: Context): Boolean =
-        prefs(context).getString(KEY_MODE, "fixed") == "smart"
-
-    fun setMode(context: Context, smart: Boolean) {
-        prefs(context).edit().putString(KEY_MODE, if (smart) "smart" else "fixed").apply()
     }
 
     /** 当前网络是否为 WiFi；不是 WiFi 时不做任何限速判断。 */
@@ -244,6 +236,9 @@ object SmartScheduler {
             .putLong(KEY_LAST_AT, now)
             .apply()
         AlarmScheduler.markReset(context, now)
+        // 智能重置是固定周期之外的提前重置：同步把周期基准推到此刻，
+        // 并重新排程固定闹钟，避免旧的周期闹钟在保护期内重复触发。
+        if (AlarmScheduler.isEnabled(context)) AlarmScheduler.schedule(context)
         scheduleSample(context, PROTECT_MS)
     }
 
@@ -283,9 +278,9 @@ object SmartScheduler {
         return (cooldownMs(context) / 60_000L).toInt()
     }
 
-    /** 仪表盘展示用状态。 */
+    /** 仪表盘展示用状态。智能策略是固定周期之外的辅助检测。 */
     fun statusText(context: Context): String {
-        if (!isEnabled(context)) return "智能策略 · 未启用"
+        if (!isEnabled(context)) return "智能辅助 · 未启用"
         if (!isTargetCached(context)) return "非目标 WiFi · 未监测"
         val prefs = prefs(context)
         val now = System.currentTimeMillis()

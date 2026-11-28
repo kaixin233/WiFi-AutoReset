@@ -148,54 +148,6 @@
                     android:textSize="13sp" />
             </LinearLayout>
 
-            <RadioGroup
-                android:id="@+id/chip_mode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <RadioButton
-                    android:id="@+id/radio_fixed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_chip"
-                    android:button="@null"
-                    android:checked="true"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:text="固定周期"
-                    android:textAllCaps="false"
-                    android:textColor="@color/chip_text_color"
-                    android:textSize="13sp" />
-
-                <RadioButton
-                    android:id="@+id/radio_smart"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_chip"
-                    android:button="@null"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:text="智能策略"
-                    android:textAllCaps="false"
-                    android:textColor="@color/chip_text_color"
-                    android:textSize="13sp" />
-            </RadioGroup>
-
-            <TextView
-                android:id="@+id/text_smart_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:gravity="center"
-                android:text="智能策略 · 未启用"
-                android:textColor="@color/primary"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-
             <LinearLayout
                 android:id="@+id/fixed_controls"
                 android:layout_width="match_parent"
@@ -319,6 +271,54 @@
             </HorizontalScrollView>
 
             </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="12dp"
+                android:background="@color/divider" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/CardTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="智能辅助" />
+
+                <Switch
+                    android:id="@+id/switch_smart"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:text="辅助检测"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/CardHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="固定周期之外额外检测云控限速，空闲时提前重置" />
+
+            <TextView
+                android:id="@+id/text_smart_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="智能辅助 · 未启用"
+                android:textColor="@color/primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btn_save"

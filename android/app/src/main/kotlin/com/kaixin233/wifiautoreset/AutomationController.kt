@@ -16,8 +16,11 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * 仪表盘内的自动恢复区块：固定周期模式与智能策略模式二选一。
- * 智能模式只在确认云控限速且用户空闲时执行重置，尽量不打断体验。
+ * 仪表盘内的自动恢复区块：以固定周期为主，智能策略作为可选的辅助检测手段。
+ *
+ * - 固定周期：独立开关 + 周期，按最后一次重置时间链式排程。
+ * - 智能辅助：独立开关，在固定周期之外检测云控限速，空闲时提前重置；不影响固定周期节奏。
+ * 两者可同时开启，也可单独使用；任一开启都会拉起前台守护服务保住闹钟。
  */
 class AutomationController(
     private val activity: Activity,
@@ -25,9 +28,9 @@ class AutomationController(
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var enabled = false
+    private var smartAssist = false
     private var interval = AlarmScheduler.DEFAULT_INTERVAL_MINUTES
     private var active = false
-    private var modeSmart = false
     private var pendingAutoStart = false
 
     private val presets = mapOf(
@@ -47,21 +50,27 @@ class AutomationController(
 
     init {
         val prefs = AlarmScheduler.prefs(activity)
-        modeSmart = SmartScheduler.isSmartMode(activity)
-        enabled = if (modeSmart) SmartScheduler.isEnabled(activity) else AlarmScheduler.isEnabled(activity)
+        enabled = AlarmScheduler.isEnabled(activity)
+        smartAssist = SmartScheduler.isEnabled(activity)
         interval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
             .coerceIn(AlarmScheduler.MIN_INTERVAL_MINUTES, AlarmScheduler.MAX_INTERVAL_MINUTES)
 
-        val switch = view.find<Switch>(R.id.switch_enabled)
-        switch.isChecked = enabled
-        switch.setOnCheckedChangeListener { _, checked ->
-            enabled = checked
-            updateStatus()
-            updateCountdown()
+        view.find<Switch>(R.id.switch_enabled).apply {
+            isChecked = enabled
+            setOnCheckedChangeListener { _, checked ->
+                enabled = checked
+                updateStatus()
+                updateCountdown()
+            }
         }
-
-        view.find<RadioButton>(R.id.radio_fixed).setOnClickListener { switchMode(false) }
-        view.find<RadioButton>(R.id.radio_smart).setOnClickListener { switchMode(true) }
+        view.find<Switch>(R.id.switch_smart).apply {
+            isChecked = smartAssist
+            setOnCheckedChangeListener { _, checked ->
+                smartAssist = checked
+                updateStatus()
+                updateCountdown()
+            }
+        }
 
         presets.forEach { (id, minutes) ->
             view.find<RadioButton>(id).setOnClickListener {
@@ -78,7 +87,6 @@ class AutomationController(
         view.find<Button>(R.id.btn_battery).setOnClickListener { confirmBattery() }
 
         selectPreset(interval)
-        applyModeVisibility()
         updateStatus()
         updateCountdown()
         refreshKeepAlive()
@@ -111,23 +119,6 @@ class AutomationController(
     }
 
     fun onDestroy() = onHide()
-
-    private fun switchMode(smart: Boolean) {
-        if (modeSmart == smart) return
-        modeSmart = smart
-        enabled = if (smart) SmartScheduler.isEnabled(activity) else AlarmScheduler.isEnabled(activity)
-        view.find<Switch>(R.id.switch_enabled).isChecked = enabled
-        applyModeVisibility()
-        updateStatus()
-        updateCountdown()
-    }
-
-    private fun applyModeVisibility() {
-        view.find<RadioButton>(R.id.radio_fixed).isChecked = !modeSmart
-        view.find<RadioButton>(R.id.radio_smart).isChecked = modeSmart
-        view.find<View>(R.id.fixed_controls).visibility = if (modeSmart) View.GONE else View.VISIBLE
-        view.find<View>(R.id.text_smart_status).visibility = if (modeSmart) View.VISIBLE else View.GONE
-    }
 
     private fun selectPreset(minutes: Int) {
         val isPreset = presets.values.contains(minutes)
@@ -168,83 +159,70 @@ class AutomationController(
             .show()
     }
 
+    /** 一次保存两项独立配置：固定周期为主，智能辅助可选。 */
     private fun save() {
-        if (modeSmart) saveSmart() else saveFixed()
-        updateStatus()
-        updateCountdown()
-    }
-
-    private fun saveSmart() {
         val prefs = AlarmScheduler.prefs(activity)
-        val wasEnabled = SmartScheduler.isEnabled(activity)
-        prefs.edit()
-            .putString(SmartScheduler.KEY_MODE, "smart")
-            .putBoolean(SmartScheduler.KEY_SMART_ENABLED, enabled)
-            .putBoolean(AlarmScheduler.KEY_ENABLED, false)
-            .apply()
-        AlarmScheduler.cancel(activity)
-        SmartScheduler.cancelAll(activity)
-
-        if (enabled) {
-            if (!wasEnabled) SmartScheduler.resetState(activity)
-            SmartScheduler.scheduleSample(activity, 5_000L)
-            KeepAliveService.start(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "智能策略已开启", "成功"))
-            Toast.makeText(activity, "已开启：限速且空闲时自动重置", Toast.LENGTH_SHORT).show()
-        } else {
-            SmartScheduler.resetState(activity)
-            KeepAliveService.stop(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "智能策略已关闭", "成功"))
-            Toast.makeText(activity, "智能策略已关闭", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun saveFixed() {
-        val prefs = AlarmScheduler.prefs(activity)
-        val wasEnabled = prefs.getBoolean(AlarmScheduler.KEY_ENABLED, false)
-        val oldInterval = prefs.getInt(AlarmScheduler.KEY_INTERVAL_MINUTES, AlarmScheduler.DEFAULT_INTERVAL_MINUTES)
+        val wasFixed = AlarmScheduler.isEnabled(activity)
+        val wasSmart = SmartScheduler.isEnabled(activity)
+        val oldInterval = prefs.getInt(
+            AlarmScheduler.KEY_INTERVAL_MINUTES,
+            AlarmScheduler.DEFAULT_INTERVAL_MINUTES,
+        )
 
         prefs.edit()
-            .putString(SmartScheduler.KEY_MODE, "fixed")
             .putBoolean(AlarmScheduler.KEY_ENABLED, enabled)
-            .putBoolean(SmartScheduler.KEY_SMART_ENABLED, false)
+            .putBoolean(SmartScheduler.KEY_SMART_ENABLED, smartAssist)
             .putInt(AlarmScheduler.KEY_INTERVAL_MINUTES, interval)
             .apply()
-        SmartScheduler.cancelAll(activity)
-        SmartScheduler.resetState(activity)
 
+        // 固定周期：基准过期或周期变更时从当前时刻重新起算，然后排程。
         if (enabled) {
             val base = AlarmScheduler.lastResetAt(activity)
             val next = AlarmScheduler.nextRunMillis(activity)
             if (base <= 0L || next <= System.currentTimeMillis() ||
-                (wasEnabled && oldInterval != interval)
+                (wasFixed && oldInterval != interval)
             ) {
                 AlarmScheduler.markReset(activity)
             }
             AlarmScheduler.schedule(activity)
-            KeepAliveService.start(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务已开启", "成功"))
-            Toast.makeText(activity, "已开启：${Utils.intervalLabel(interval)}", Toast.LENGTH_SHORT).show()
         } else {
             AlarmScheduler.cancel(activity)
-            KeepAliveService.stop(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "定时任务已关闭", "成功"))
-            Toast.makeText(activity, "定时任务已关闭", Toast.LENGTH_SHORT).show()
         }
+
+        // 智能辅助：独立启停，开启时重新采样，关闭时清空判定状态。
+        if (smartAssist) {
+            if (!wasSmart) SmartScheduler.resetState(activity)
+            SmartScheduler.scheduleSample(activity, 5_000L)
+        } else {
+            SmartScheduler.cancelAll(activity)
+            SmartScheduler.resetState(activity)
+        }
+
+        // 守护服务：任一启用即保活，全部关闭才停止。
+        if (enabled || smartAssist) {
+            KeepAliveService.start(activity)
+        } else {
+            KeepAliveService.stop(activity)
+        }
+
+        val parts = mutableListOf<String>()
+        parts += if (enabled) "周期 ${Utils.intervalLabel(interval)}" else "周期关闭"
+        parts += if (smartAssist) "智能辅助开" else "智能辅助关"
+        AppLog.append(activity, LogEntry(LogEntry.now(), "自动任务已保存", parts.joinToString("，")))
+        Toast.makeText(activity, parts.joinToString(" · "), Toast.LENGTH_SHORT).show()
+
+        updateStatus()
+        updateCountdown()
     }
 
     private fun updateStatus() {
         val status = view.find<TextView>(R.id.text_schedule_status)
-        status.text = if (modeSmart) {
-            "智能策略 · ${if (enabled) "监测中" else "已关闭"}"
-        } else {
-            "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"}"
-        }
+        status.text = if (enabled) "${Utils.intervalLabel(interval)} · 运行中" else "固定周期 · 已关闭"
     }
 
     private fun updateCountdown() {
+        // 固定周期倒计时始终按主任务显示；智能辅助状态单独一行展示。
         view.find<TextView>(R.id.text_smart_status).text = SmartScheduler.statusText(activity)
-        if (modeSmart) return
         val countdown = view.find<TextView>(R.id.text_countdown)
         val absolute = view.find<TextView>(R.id.text_next_absolute)
         if (!enabled) {

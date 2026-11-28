@@ -146,7 +146,7 @@ class SmartReceiver : BroadcastReceiver() {
         }
         if (avg >= SmartScheduler.RECOVER_BYTES_PER_SEC) {
             SmartScheduler.markVerified(app)
-            Notifier.notifyLow(app, "重置已生效", "网速已恢复，智能策略继续监测")
+            Notifier.notifyLow(app, "重置已生效", "网速已恢复，智能辅助继续监测")
             return
         }
         if (avg < SmartScheduler.LOW_BYTES_PER_SEC) {
