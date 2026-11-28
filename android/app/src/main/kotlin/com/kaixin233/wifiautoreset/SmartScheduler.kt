@@ -12,7 +12,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 智能限速调控：以「上下行之和 < 500 KB/s」判定云控限速，
+ * 智能策略调控：以「上下行之和 < 500 KB/s」判定云控限速，
  * 并只在用户空闲时执行恢复出厂，尽量不打断使用。
  *
  * 采样用非精确闹钟 + 内核计数器差值，无网络请求、无常驻轮询线程。
@@ -196,7 +196,7 @@ object SmartScheduler {
 
     /** 仪表盘展示用状态。 */
     fun statusText(context: Context): String {
-        if (!isEnabled(context)) return "智能限速 · 未启用"
+        if (!isEnabled(context)) return "智能策略 · 未启用"
         val prefs = prefs(context)
         val last = prefs.getLong(KEY_LAST_SMART_RESET, 0L)
         val remaining = COOLDOWN_MS - (System.currentTimeMillis() - last)

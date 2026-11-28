@@ -26,7 +26,7 @@ object Notifier {
     const val KEEPALIVE_NOTIFICATION_ID = 1002
     /** 悬浮窗服务通知 id，需与守护服务区分。 */
     const val OVERLAY_NOTIFICATION_ID = 1003
-    /** 智能限速过程的低优先级提示，避免打断用户。 */
+    /** 智能策略过程的低优先级提示，避免打断用户。 */
     private const val SMART_NOTIFICATION_ID = 1004
 
     private fun manager(context: Context): NotificationManager =
@@ -83,7 +83,7 @@ object Notifier {
         manager(context).notify(1001, notification)
     }
 
-    /** 智能限速的低优先级提示：静默、不震动，仅出现在通知栏。 */
+    /** 智能策略的低优先级提示：静默、不震动，仅出现在通知栏。 */
     fun notifyLow(context: Context, title: String, text: String) {
         ensureKeepaliveChannel(context)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

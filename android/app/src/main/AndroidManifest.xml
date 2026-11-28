@@ -43,7 +43,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- 智能限速调控：采样、复核、空闲检查与执行，均由系统闹钟触发。 -->
+        <!-- 智能策略调控：采样、复核、空闲检查与执行，均由系统闹钟触发。 -->
         <receiver
             android:name=".SmartReceiver"
             android:exported="false">

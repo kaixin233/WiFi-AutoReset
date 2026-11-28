@@ -6,7 +6,7 @@ import android.content.Intent
 import android.os.PowerManager
 
 /**
- * 智能限速调控的闹钟接收器。
+ * 智能策略调控的闹钟接收器。
  *
  * 采样 → 连续 2 次低速 → 30 秒复核 → 等待空闲 → 执行重置，
  * 每一步都由系统闹钟驱动，持有短暂 WakeLock 保证后台执行完成。
@@ -199,11 +199,11 @@ class SmartReceiver : BroadcastReceiver() {
     private fun doReset(app: Context) {
         try {
             MifiClient.factoryReset()
-            AppLog.append(app, LogEntry(LogEntry.now(), "智能重置（限速）", "成功"))
+            AppLog.append(app, LogEntry(LogEntry.now(), "智能重置", "成功"))
             SmartScheduler.noteReset(app)
             Notifier.notify(app, "智能重置已执行", "检测到云控限速，随身 WiFi 已恢复出厂，即将重启断网")
         } catch (e: Exception) {
-            AppLog.append(app, LogEntry(LogEntry.now(), "智能重置（限速）", "失败"))
+            AppLog.append(app, LogEntry(LogEntry.now(), "智能重置", "失败"))
             SmartScheduler.prefs(app).edit()
                 .putBoolean(SmartScheduler.KEY_PENDING_RESET, false)
                 .apply()

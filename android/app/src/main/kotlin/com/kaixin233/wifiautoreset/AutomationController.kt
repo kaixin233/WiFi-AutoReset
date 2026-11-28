@@ -16,7 +16,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * 仪表盘内的自动恢复区块：固定周期模式与智能限速模式二选一。
+ * 仪表盘内的自动恢复区块：固定周期模式与智能策略模式二选一。
  * 智能模式只在确认云控限速且用户空闲时执行重置，尽量不打断体验。
  */
 class AutomationController(
@@ -189,13 +189,13 @@ class AutomationController(
             if (!wasEnabled) SmartScheduler.resetState(activity)
             SmartScheduler.scheduleSample(activity, 5_000L)
             KeepAliveService.start(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "智能限速已开启", "成功"))
+            AppLog.append(activity, LogEntry(LogEntry.now(), "智能策略已开启", "成功"))
             Toast.makeText(activity, "已开启：限速且空闲时自动重置", Toast.LENGTH_SHORT).show()
         } else {
             SmartScheduler.resetState(activity)
             KeepAliveService.stop(activity)
-            AppLog.append(activity, LogEntry(LogEntry.now(), "智能限速已关闭", "成功"))
-            Toast.makeText(activity, "智能限速已关闭", Toast.LENGTH_SHORT).show()
+            AppLog.append(activity, LogEntry(LogEntry.now(), "智能策略已关闭", "成功"))
+            Toast.makeText(activity, "智能策略已关闭", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -236,7 +236,7 @@ class AutomationController(
     private fun updateStatus() {
         val status = view.find<TextView>(R.id.text_schedule_status)
         status.text = if (modeSmart) {
-            "智能限速 · ${if (enabled) "监测中" else "已关闭"}"
+            "智能策略 · ${if (enabled) "监测中" else "已关闭"}"
         } else {
             "${Utils.intervalLabel(interval)} · ${if (enabled) "运行中" else "已关闭"}"
         }

@@ -178,7 +178,7 @@
                     android:button="@null"
                     android:paddingStart="14dp"
                     android:paddingEnd="14dp"
-                    android:text="智能限速"
+                    android:text="智能策略"
                     android:textAllCaps="false"
                     android:textColor="@color/chip_text_color"
                     android:textSize="13sp" />
@@ -190,7 +190,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:gravity="center"
-                android:text="智能限速 · 未启用"
+                android:text="智能策略 · 未启用"
                 android:textColor="@color/primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
